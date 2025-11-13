@@ -126,15 +126,8 @@ GRANT SELECT ON customer_summary TO authenticated;
 GRANT SELECT ON ticket_summary TO authenticated;
 GRANT SELECT ON user_workload TO authenticated;
 
--- Create RLS policies for views (they inherit from base tables, but we add explicit policies for clarity)
-CREATE POLICY "Authenticated users can view customer summary" ON customer_summary
-    FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can view ticket summary" ON ticket_summary
-    FOR SELECT USING (auth.role() = 'authenticated');
-
-CREATE POLICY "Authenticated users can view user workload" ON user_workload
-    FOR SELECT USING (auth.role() = 'authenticated');
+-- Note: Views inherit RLS policies from their underlying tables automatically
+-- No need to create explicit RLS policies on views
 
 -- Create a function to get dashboard data
 CREATE OR REPLACE FUNCTION get_dashboard_data(p_user_id UUID DEFAULT NULL)
@@ -191,14 +184,16 @@ $$ language 'plpgsql';
 
 -- Create a function to validate product constraint before insertion
 CREATE OR REPLACE FUNCTION validate_product_active_count()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER AS $
 DECLARE
     active_count INTEGER;
 BEGIN
     IF NEW.is_active = true THEN
+        -- Count active products excluding the current one being updated
         SELECT COUNT(*) INTO active_count 
         FROM products 
-        WHERE is_active = true;
+        WHERE is_active = true 
+        AND id != NEW.id;
         
         IF active_count >= 3 THEN
             RAISE EXCEPTION 'Maximum of 3 active products allowed. Currently have % active products.', active_count;

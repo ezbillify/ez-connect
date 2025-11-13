@@ -28,7 +28,12 @@ CREATE TRIGGER update_ticket_comments_updated_at BEFORE UPDATE ON ticket_comment
 -- Function to log ticket status changes
 CREATE OR REPLACE FUNCTION log_ticket_status_change()
 RETURNS TRIGGER AS $$
+DECLARE
+    changed_by_user UUID;
 BEGIN
+    -- Get current user from auth context
+    changed_by_user = auth.uid();
+    
     -- Only log if status actually changed
     IF OLD.status IS DISTINCT FROM NEW.status THEN
         INSERT INTO ticket_workflow_history (
@@ -41,19 +46,19 @@ BEGIN
             NEW.id,
             OLD.status,
             NEW.status,
-            NEW.updated_by,
+            changed_by_user,
             'Status changed from ' || COALESCE(OLD.status::text, 'NULL') || ' to ' || NEW.status::text
         );
     END IF;
     
     -- Update resolved_at and closed_at timestamps
-    IF NEW.status = 'resolved' AND OLD.status != 'resolved' THEN
+    IF NEW.status = 'resolved' AND (OLD.status IS NULL OR OLD.status != 'resolved') THEN
         NEW.resolved_at = NOW();
     ELSIF NEW.status != 'resolved' AND OLD.status = 'resolved' THEN
         NEW.resolved_at = NULL;
     END IF;
     
-    IF NEW.status = 'closed' AND OLD.status != 'closed' THEN
+    IF NEW.status = 'closed' AND (OLD.status IS NULL OR OLD.status != 'closed') THEN
         NEW.closed_at = NOW();
     ELSIF NEW.status != 'closed' AND OLD.status = 'closed' THEN
         NEW.closed_at = NULL;

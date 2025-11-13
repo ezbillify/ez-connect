@@ -12,7 +12,10 @@ supabase/
 │   ├── 20240101000002_rls_policies.sql
 │   ├── 20240101000003_functions_triggers.sql
 │   ├── 20240101000004_storage_setup.sql
-│   └── 20240101000005_seed_data_and_views.sql
+│   ├── 20240101000005_seed_data_and_views.sql
+│   └── 20240101000006_seed_admin_user.sql
+├── sql/                        # SQL utilities and tests
+│   └── test_migrations.sql     # Comprehensive test suite
 └── README.md                   # This file
 ```
 
@@ -137,6 +140,37 @@ SUPABASE_ANON_KEY=your_local_anon_key
 - Summary views for common queries
 - Dashboard functions
 
+### 6. Admin User Setup (`20240101000006_seed_admin_user.sql`)
+- Creates initial admin/superadmin user
+- Email: `admin@ezbillify.com`
+- Password: `admin123`
+- Helper function to reset admin password
+
+## 🔐 Admin Access
+
+An admin user is automatically created during migration:
+
+**Credentials:**
+- **Email**: `admin@ezbillify.com`
+- **Password**: `admin123`
+
+**Important**: Change the admin password immediately after first login in production!
+
+### Resetting Admin Password
+
+If you need to reset the admin password:
+
+```sql
+-- Via Supabase Studio SQL editor or psql
+SELECT reset_admin_password('new_password_here');
+```
+
+Or for development (reset to default):
+
+```sql
+SELECT reset_admin_password(); -- resets to 'admin123'
+```
+
 ## 🔒 Security Model
 
 ### Access Patterns
@@ -259,6 +293,77 @@ SUPABASE_ANON_KEY=your_production_anon_key
 - Check the [migration guide](../docs/SUPABASE_MIGRATIONS.md)
 - Review [Supabase documentation](https://supabase.com/docs)
 - Check [GitHub issues](https://github.com/supabase/supabase/issues)
+
+### Admin Login Issues
+
+If you cannot login with the admin credentials:
+
+1. **Verify user exists:**
+   ```sql
+   SELECT id, email, email_confirmed_at FROM auth.users WHERE email = 'admin@ezbillify.com';
+   ```
+
+2. **Check profile:**
+   ```sql
+   SELECT * FROM profiles WHERE email = 'admin@ezbillify.com';
+   ```
+
+3. **Reset password:**
+   ```sql
+   SELECT reset_admin_password('admin123');
+   ```
+
+4. **Re-create admin user:**
+   ```bash
+   ./supabase_dev.sh shell
+   # Then run the seed_admin_user function from migration 20240101000006
+   ```
+
+### RLS Policy Issues
+
+If you're getting permission errors:
+
+1. **Check RLS is enabled:**
+   ```sql
+   SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public';
+   ```
+
+2. **View policies for a table:**
+   ```sql
+   SELECT * FROM pg_policies WHERE tablename = 'your_table_name';
+   ```
+
+3. **Test as admin:**
+   ```sql
+   -- Set session to simulate admin user
+   SET request.jwt.claims TO '{"sub": "admin-user-id", "role": "authenticated"}';
+   ```
+
+### Migration Errors
+
+If migrations fail:
+
+1. **Check current migration status:**
+   ```bash
+   ./supabase_dev.sh status
+   ```
+
+2. **View migration history:**
+   ```sql
+   SELECT * FROM supabase_migrations.schema_migrations ORDER BY version;
+   ```
+
+3. **Reset and retry (development only):**
+   ```bash
+   ./supabase_dev.sh reset
+   ```
+
+4. **Manual migration repair:**
+   ```bash
+   # Mark a migration as applied manually
+   ./supabase_dev.sh shell
+   # INSERT INTO supabase_migrations.schema_migrations (version) VALUES ('20240101000006');
+   ```
 
 ## 🛠️ Scripts
 

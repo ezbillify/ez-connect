@@ -47,9 +47,6 @@ CREATE TYPE user_role AS ENUM (
 -- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Enable Row Level Security
-ALTER DATABASE postgres SET "app.settings.jwt_secret" TO 'your-jwt-secret';
-
 -- Create profiles table (extends auth.users)
 CREATE TABLE profiles (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
@@ -62,17 +59,14 @@ CREATE TABLE profiles (
 );
 
 -- Create products table with max 3 active constraint
+-- Note: The max 3 active products constraint is enforced via trigger in migration 20240101000005
 CREATE TABLE products (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
     name TEXT NOT NULL,
     description TEXT DEFAULT '',
     is_active BOOLEAN DEFAULT true NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    
-    CONSTRAINT max_active_products CHECK (
-        (SELECT COUNT(*) FROM products WHERE is_active = true) <= 3
-    )
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
 
 -- Create acquisition stages table
