@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide Provider;
 import 'package:app/data/services/realtime_channel_manager.dart';
 import 'package:app/data/services/realtime_event_dispatcher.dart';
 import 'package:app/data/repositories/crm_realtime_repository.dart';

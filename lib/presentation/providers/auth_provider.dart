@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:gotrue/gotrue.dart' hide Provider;
+import 'package:supabase_flutter/supabase_flutter.dart' hide Provider;
 import 'package:app/data/datasources/supabase_auth_datasource.dart';
 import 'package:app/data/repositories/auth_repository_impl.dart';
 import 'package:app/domain/models/auth_state.dart' as auth_state_model;
