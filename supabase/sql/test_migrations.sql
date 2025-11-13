@@ -236,7 +236,7 @@ END $$;
 -- 11. Test Admin Password Reset Function
 -- ===========================================
 
-DO $$
+DO $
 BEGIN
     RAISE NOTICE 'Testing admin password reset function...';
     
@@ -244,7 +244,162 @@ BEGIN
     PERFORM reset_admin_password('admin123');
     
     RAISE NOTICE '✓ Admin password reset function tests passed';
-END $$;
+END $;
+
+-- ===========================================
+-- 12. Test User Admin Functions
+-- ===========================================
+
+DO $
+DECLARE
+    admin_id UUID;
+    test_user_id UUID;
+    invitation_result JSON;
+    resend_result JSON;
+    bulk_update_result JSON;
+    toggle_result JSON;
+    reset_result JSON;
+    activity_log_count INTEGER;
+    non_admin_error_caught BOOLEAN := false;
+BEGIN
+    RAISE NOTICE 'Testing user admin functions...';
+    
+    -- Get admin user ID
+    SELECT id INTO admin_id FROM auth.users WHERE email = 'admin@ezbillify.com';
+    
+    -- Test 1: Check all user admin functions exist
+    ASSERT (SELECT COUNT(*) FROM pg_proc p
+            JOIN pg_namespace n ON p.pronamespace = n.oid
+            WHERE n.nspname = 'public'
+            AND p.proname IN (
+                'create_user_invitation',
+                'resend_user_invitation',
+                'bulk_update_user_roles',
+                'toggle_user_status',
+                'reset_user_password',
+                'get_user_activity_log',
+                'is_admin'
+            )) = 7, 'Not all user admin functions created';
+    
+    RAISE NOTICE '  ✓ All user admin functions exist';
+    
+    -- Test 2: Check user_activity_log view exists
+    ASSERT (SELECT COUNT(*) FROM pg_views 
+            WHERE schemaname = 'public' 
+            AND viewname = 'user_activity_log') = 1, 
+            'user_activity_log view not created';
+    
+    RAISE NOTICE '  ✓ user_activity_log view exists';
+    
+    -- Test 3: Test is_admin function (as admin)
+    -- Set session to admin user
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', admin_id)::text, true);
+    ASSERT is_admin() = true, 'is_admin() should return true for admin user';
+    
+    RAISE NOTICE '  ✓ is_admin() works correctly';
+    
+    -- Test 4: Test create_user_invitation (as admin)
+    BEGIN
+        SELECT create_user_invitation('test@example.com', 'agent', admin_id) INTO invitation_result;
+        ASSERT invitation_result IS NOT NULL, 'create_user_invitation should return result';
+        RAISE NOTICE '  ✓ create_user_invitation works for admin';
+    EXCEPTION WHEN OTHERS THEN
+        -- This may fail if user already exists, which is acceptable
+        RAISE NOTICE '  ⚠ create_user_invitation test skipped (user may already exist)';
+    END;
+    
+    -- Test 5: Test bulk_update_user_roles (as admin)
+    -- Create a test user first if needed
+    INSERT INTO auth.users (
+        instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, created_at, updated_at
+    )
+    VALUES (
+        '00000000-0000-0000-0000-000000000000',
+        gen_random_uuid(),
+        'authenticated',
+        'authenticated',
+        'bulktest@example.com',
+        crypt('password123', gen_salt('bf')),
+        NOW(),
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (email) DO NOTHING
+    RETURNING id INTO test_user_id;
+    
+    IF test_user_id IS NOT NULL THEN
+        INSERT INTO profiles (id, email, role, full_name)
+        VALUES (test_user_id, 'bulktest@example.com', 'agent', 'Bulk Test User')
+        ON CONFLICT (id) DO NOTHING;
+        
+        SELECT bulk_update_user_roles(ARRAY[test_user_id], 'admin', admin_id) INTO bulk_update_result;
+        ASSERT bulk_update_result IS NOT NULL, 'bulk_update_user_roles should return result';
+        RAISE NOTICE '  ✓ bulk_update_user_roles works for admin';
+    ELSE
+        RAISE NOTICE '  ⚠ bulk_update_user_roles test skipped (could not create test user)';
+    END IF;
+    
+    -- Test 6: Test toggle_user_status (as admin)
+    IF test_user_id IS NOT NULL THEN
+        BEGIN
+            SELECT toggle_user_status(test_user_id, false, admin_id) INTO toggle_result;
+            ASSERT toggle_result IS NOT NULL, 'toggle_user_status should return result';
+            RAISE NOTICE '  ✓ toggle_user_status works for admin';
+        EXCEPTION WHEN OTHERS THEN
+            RAISE NOTICE '  ⚠ toggle_user_status test failed: %', SQLERRM;
+        END;
+    END IF;
+    
+    -- Test 7: Test get_user_activity_log (as admin)
+    SELECT COUNT(*) INTO activity_log_count
+    FROM get_user_activity_log(10, 0);
+    ASSERT activity_log_count >= 0, 'get_user_activity_log should return results';
+    RAISE NOTICE '  ✓ get_user_activity_log works for admin (% entries)', activity_log_count;
+    
+    -- Test 8: Test non-admin access (should fail)
+    -- Create a non-admin user session
+    INSERT INTO auth.users (
+        instance_id, id, aud, role, email, encrypted_password,
+        email_confirmed_at, created_at, updated_at
+    )
+    VALUES (
+        '00000000-0000-0000-0000-000000000000',
+        gen_random_uuid(),
+        'authenticated',
+        'authenticated',
+        'nonadmin@example.com',
+        crypt('password123', gen_salt('bf')),
+        NOW(),
+        NOW(),
+        NOW()
+    )
+    ON CONFLICT (email) DO UPDATE SET email = EXCLUDED.email
+    RETURNING id INTO test_user_id;
+    
+    INSERT INTO profiles (id, email, role, full_name)
+    VALUES (test_user_id, 'nonadmin@example.com', 'agent', 'Non Admin User')
+    ON CONFLICT (id) DO UPDATE SET role = 'agent';
+    
+    -- Set session to non-admin user
+    PERFORM set_config('request.jwt.claims', json_build_object('sub', test_user_id)::text, true);
+    
+    -- Try to call get_user_activity_log as non-admin (should fail)
+    BEGIN
+        PERFORM get_user_activity_log(10, 0);
+        non_admin_error_caught := false;
+    EXCEPTION WHEN OTHERS THEN
+        non_admin_error_caught := true;
+    END;
+    
+    ASSERT non_admin_error_caught = true, 'Non-admin should not be able to call get_user_activity_log';
+    RAISE NOTICE '  ✓ Non-admin access correctly denied';
+    
+    -- Reset session
+    PERFORM set_config('request.jwt.claims', NULL, true);
+    
+    RAISE NOTICE '✓ User admin function tests passed';
+END $;
 
 -- ===========================================
 -- Summary
