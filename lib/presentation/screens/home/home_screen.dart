@@ -1,15 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:app/presentation/providers/auth_provider.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(currentUserProvider);
+    final userRole = ref.watch(currentUserRoleProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('App Home'),
+        actions: [
+          if (currentUser != null)
+            PopupMenuButton(
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  child: const Text('Profile'),
+                  onTap: () => context.push('/settings'),
+                ),
+                PopupMenuItem(
+                  child: const Text('Sign Out'),
+                  onTap: () async {
+                    await ref.read(authProvider.notifier).signOut();
+                    if (context.mounted) {
+                      context.go('/auth/login');
+                    }
+                  },
+                ),
+              ],
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -18,16 +43,24 @@ class HomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Welcome to Your App',
+                'Welcome ${currentUser?.name ?? 'to Your App'}',
                 style: Theme.of(context).textTheme.displaySmall,
               ),
               const Gap(8),
               Text(
-                'Explore the modules below',
+                currentUser != null
+                    ? 'Explore the modules below'
+                    : 'Sign in to continue',
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: Colors.grey[600],
                 ),
               ),
+              if (userRole != null) ...[
+                const Gap(8),
+                Chip(
+                  label: Text('Role: $userRole'),
+                ),
+              ],
               const Gap(32),
               GridView.count(
                 shrinkWrap: true,

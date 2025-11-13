@@ -5,6 +5,7 @@ class User {
   final String? avatarUrl;
   final DateTime createdAt;
   final DateTime? updatedAt;
+  final String? role;
 
   User({
     required this.id,
@@ -13,6 +14,7 @@ class User {
     this.avatarUrl,
     required this.createdAt,
     this.updatedAt,
+    this.role,
   });
 
   User copyWith({
@@ -22,6 +24,7 @@ class User {
     String? avatarUrl,
     DateTime? createdAt,
     DateTime? updatedAt,
+    String? role,
   }) {
     return User(
       id: id ?? this.id,
@@ -30,6 +33,7 @@ class User {
       avatarUrl: avatarUrl ?? this.avatarUrl,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      role: role ?? this.role,
     );
   }
 }
