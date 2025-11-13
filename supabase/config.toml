@@ -17,7 +17,7 @@ port = 54322
 # Port to use for the local database URL.
 shadow_port = 54320
 # The database major version to use. Has to be the same as your remote instance's major version.
-major_version = 15
+major_version = 17
 
 [studio]
 # Port to use for Supabase Studio.
@@ -45,12 +45,8 @@ jwt_expiry = 3600
 # If disabled, users will not be able to sign up with email/password.
 enable_signup = true
 
-[edge_functions]
-# Port to use for the Edge Functions runtime.
-port = 54321
 
 [analytics]
 enabled = false
 port = 54327
 vector_port = 54328
-backend_port = 54329

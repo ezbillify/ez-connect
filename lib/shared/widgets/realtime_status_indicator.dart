@@ -89,7 +89,7 @@ class RealtimeConnectionBanner extends ConsumerWidget {
       color: backgroundColor,
       child: Row(
         children: [
-          RealtimeStatusIndicator(showLabel: false, size: 6),
+          const RealtimeStatusIndicator(showLabel: false, size: 6),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -136,7 +136,7 @@ class LiveUpdateIndicator extends ConsumerWidget {
             Container(
               width: 6,
               height: 6,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.green,
                 shape: BoxShape.circle,
               ),

@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:app/domain/models/auth_state.dart';
 import 'package:app/domain/models/user.dart';
-import 'package:app/presentation/providers/auth_provider.dart';
 import 'package:app/presentation/providers/router_provider.dart' as router;
 
 void main() {

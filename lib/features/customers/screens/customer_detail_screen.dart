@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../../repositories/customer_repository.dart';
-import '../../../repositories/customer_interaction_repository.dart';
 import '../../../models/customer.dart';
 import '../view_models/customers_view_model.dart';
 import '../../interactions/screens/interactions_screen.dart';

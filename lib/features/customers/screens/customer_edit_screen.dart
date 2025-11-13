@@ -121,7 +121,7 @@ class _CustomerEditScreenState extends State<CustomerEditScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedProductId,
+              initialValue: _selectedProductId,
               decoration: const InputDecoration(
                 labelText: 'Product',
                 border: OutlineInputBorder(),
@@ -146,7 +146,7 @@ class _CustomerEditScreenState extends State<CustomerEditScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedStatus,
+              initialValue: _selectedStatus,
               decoration: const InputDecoration(
                 labelText: 'Status',
                 border: OutlineInputBorder(),
