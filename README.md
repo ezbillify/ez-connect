@@ -64,20 +64,21 @@ flutter pub get
 
 ### 3. Environment Configuration
 
-Create a `.env` file in the project root:
+Copy the development template and provide local credentials (file is git-ignored):
 
 ```bash
-cp .env.example .env
+cp config/environments/.env.development config/environments/.env.development.local
 ```
 
-Edit `.env` with your Supabase credentials:
-```
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-APP_ENVIRONMENT=development
-```
+Edit `config/environments/.env.development.local` with your Supabase URL, anon key, and any other environment-specific values. Repeat this pattern for staging/production by copying the respective template files.
 
-**Note**: The `.env` file is added to `.gitignore` and should never be committed to version control.
+Run the app with a specific environment by exporting `APP_ENV` or passing it as a dart define:
+
+```bash
+APP_ENV=development flutter run -d chrome
+# or
+flutter run --dart-define=APP_ENV=staging
+```
 
 ## Project Structure
 
@@ -250,14 +251,37 @@ GoRoute(
 
 ### Environment-Specific Configuration
 
-Use the `Env` class to access environment variables:
+Environment files are stored under `config/environments/` and bundled with the app:
+
+```
+config/environments/
+├── .env.development
+├── .env.staging
+├── .env.test
+└── .env.production
+```
+
+Select the active configuration with the `APP_ENV` dart define:
+
+```bash
+APP_ENV=staging flutter run -d chrome
+# or pass as a flag
+flutter run --dart-define=APP_ENV=production
+```
+
+Each file contains Supabase credentials for that environment. For secrets, create `.env.<env>.local` files (ignored by git) and surface them through your CI/CD system.
+
+Access variables through the `Env` helper:
 
 ```dart
 import 'package:app/shared/utils/env.dart';
 
-final url = Env.supabaseUrl;
+final supabaseUrl = Env.supabaseUrl;
 final anonKey = Env.supabaseAnonKey;
+final currentEnvironment = Env.appEnvironment;
 ```
+
+See [Environment Configuration](docs/ENVIRONMENT_CONFIGURATION.md) for more details.
 
 ## Supabase Integration
 
@@ -391,29 +415,52 @@ flutter run
   flutter run --profile
   ```
 
-## Testing
+## Testing & Quality Gates
 
-Run tests with:
+We follow a layered testing approach (unit ➜ widget ➜ integration). See [docs/TESTING_STRATEGY.md](docs/TESTING_STRATEGY.md) for full details.
+
+Common commands:
 ```bash
-flutter test
+# Full suite with Supabase + coverage
+./scripts/run_flutter_tests.sh
+
+# Unit tests only
+flutter test test/models test/repositories test/features
+
+# Widget tests only
+flutter test test/widget_tests
 ```
+
+Coverage reports are generated automatically under `coverage/` when running the full suite. The CI pipeline uploads `coverage/lcov.info` as an artifact for every pull request.
+
+## Continuous Integration
+
+GitHub Actions (`.github/workflows/flutter_ci.yml`) enforces code quality on every push and pull request:
+
+1. `dart format --set-exit-if-changed` – formatting gate.
+2. `flutter analyze` – static analysis and linting.
+3. `scripts/bootstrap_supabase_ci.sh` – starts Supabase locally, applies migrations, and seeds test data.
+4. `flutter test --coverage` – full unit/widget/integration suite with coverage.
+5. Uploads `coverage/lcov.info` and Supabase logs (`supabase-ci.log`) as workflow artifacts.
 
 ## Deployment
 
+See the [deployment checklist](docs/deployment/DEPLOYMENT_CHECKLIST.md) for a complete pre-release walkthrough.
+
 ### Web
-1. Build: `flutter build web --release`
-2. Deploy the `build/web/` directory to your hosting provider
-3. Recommended hosts: Firebase Hosting, Vercel, Netlify
+1. `APP_ENV=production ./scripts/build_web.sh`
+2. Deploy the contents of `build/web/` to your hosting provider (Vercel, Netlify, Firebase Hosting, etc.).
+3. Configure SPA rewrite rules so unknown routes fall back to `index.html`.
 
 ### Android
-- Generate signing key
-- Use Google Play Console for release management
-- Follow Play Store guidelines
+1. Copy `android/key.properties.example` to `android/key.properties` and update it with your keystore credentials.
+2. `APP_ENV=production ./scripts/build_android.sh appbundle`
+3. Upload the generated `.aab` to Google Play Console and complete the release process.
 
 ### iOS
-- Create App Store Connect account
-- Configure certificates and provisioning profiles
-- Use TestFlight for beta testing
+1. Open `ios/Runner.xcworkspace` to verify bundle identifiers and signing teams.
+2. `APP_ENV=production ./scripts/build_ios.sh --no-codesign` (remove `--no-codesign` when codesigning for TestFlight/App Store).
+3. Upload the resulting `.ipa` via Xcode Organizer or Transporter.
 
 ## External Integrations
 

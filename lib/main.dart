@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app/shared/theme/app_theme.dart';
@@ -9,20 +9,23 @@ import 'package:app/presentation/providers/realtime_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  await dotenv.load(fileName: '.env');
-  
-  // Initialize Supabase
+
+  await Env.load();
+
   final supabaseUrl = Env.supabaseUrl;
   final supabaseAnonKey = Env.supabaseAnonKey;
-  
+
   if (supabaseUrl != null && supabaseAnonKey != null) {
     await Supabase.initialize(
       url: supabaseUrl,
       anonKey: supabaseAnonKey,
     );
+  } else {
+    debugPrint(
+      'Supabase credentials were not provided for the ${Env.environment} environment. Supabase initialization skipped.',
+    );
   }
-  
+
   runApp(const ProviderScope(child: MyApp()));
 }
 
