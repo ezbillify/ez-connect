@@ -228,13 +228,10 @@ CREATE POLICY "Users can view own integration tokens" ON integration_tokens
 CREATE POLICY "Users can manage own integration tokens" ON integration_tokens
     FOR ALL USING (created_by = auth.uid());
 
--- Integration tokens can be used for authentication (read-only access)
-CREATE POLICY "Integration tokens can access permitted data" ON integration_tokens
+-- Admins can view all integration tokens
+CREATE POLICY "Admins can view all integration tokens" ON integration_tokens
     FOR SELECT USING (
-        EXISTS (
-            SELECT 1 FROM auth.jwt() ->> 'integration_token_id' AS token_id
-            WHERE token_id::text = integration_tokens.id::text
-        )
+        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
     );
 
 -- Audit history policies

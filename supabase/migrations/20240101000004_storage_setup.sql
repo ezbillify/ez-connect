@@ -78,7 +78,7 @@ CREATE POLICY "Users can upload ticket attachments" ON storage.objects
         bucket_id = 'ticket-attachments' AND
         auth.role() = 'authenticated' AND
         -- Extract ticket_id from path (format: ticket_id/filename)
-        (
+        EXISTS (
             SELECT 1 FROM tickets 
             WHERE tickets.id::text = SPLIT_PART(name, '/', 1)
             AND (tickets.created_by = auth.uid() OR 
@@ -92,7 +92,7 @@ CREATE POLICY "Users can upload ticket attachments" ON storage.objects
 CREATE POLICY "Users can view ticket attachments" ON storage.objects
     FOR SELECT USING (
         bucket_id = 'ticket-attachments' AND
-        (
+        EXISTS (
             SELECT 1 FROM tickets 
             WHERE tickets.id::text = SPLIT_PART(name, '/', 1)
             AND (tickets.created_by = auth.uid() OR 
@@ -107,7 +107,7 @@ CREATE POLICY "Users can update own attachments" ON storage.objects
     FOR UPDATE USING (
         bucket_id = 'ticket-attachments' AND
         auth.role() = 'authenticated' AND
-        (
+        EXISTS (
             SELECT 1 FROM ticket_attachments 
             WHERE ticket_attachments.file_path = storage.objects.name
             AND ticket_attachments.uploaded_by = auth.uid()
@@ -132,17 +132,15 @@ CREATE POLICY "Users can delete own attachments" ON storage.objects
 CREATE INDEX idx_ticket_attachments_ticket_id ON ticket_attachments(ticket_id);
 CREATE INDEX idx_ticket_attachments_uploaded_by ON ticket_attachments(uploaded_by);
 
--- Function to generate signed URL for ticket attachments
-CREATE OR REPLACE FUNCTION get_ticket_attachment_url(
-    p_attachment_id UUID,
-    p_expires_in INTEGER DEFAULT 3600
+-- Function to get ticket attachment path for client-side signed URL generation
+CREATE OR REPLACE FUNCTION get_ticket_attachment_path(
+    p_attachment_id UUID
 ) RETURNS TEXT AS $$
 DECLARE
-    attachment_record RECORD;
-    signed_url TEXT;
+    attachment_path TEXT;
 BEGIN
-    -- Get attachment record and verify access
-    SELECT ta.*, t.* INTO attachment_record
+    -- Get attachment path and verify access
+    SELECT ta.file_path INTO attachment_path
     FROM ticket_attachments ta
     JOIN tickets t ON ta.ticket_id = t.id
     WHERE ta.id = p_attachment_id
@@ -153,18 +151,11 @@ BEGIN
         (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
     );
     
-    IF NOT FOUND THEN
+    IF attachment_path IS NULL THEN
         RAISE EXCEPTION 'Attachment not found or access denied';
     END IF;
     
-    -- Generate signed URL
-    SELECT public.sign_url(
-        'ticket-attachments',
-        attachment_record.file_path,
-        p_expires_in
-    ) INTO signed_url;
-    
-    RETURN signed_url;
+    RETURN attachment_path;
 END;
 $$ language 'plpgsql' SECURITY DEFINER;
 
