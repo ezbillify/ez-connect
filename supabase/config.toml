@@ -1,0 +1,56 @@
+# A string used to differentiate different projects.
+project_id = "crm_app"
+
+[api]
+# Port to use for the API URL.
+port = 54321
+# Schemas to expose in your API. Tables, views and foreign keys in public schema are automatically exposed.
+schemas = ["public", "graphql_public"]
+# Extra schemas to add to the search_path of every request.
+extra_search_path = ["public", "extensions"]
+# Maximum rows an API request can return.
+max_rows = 1000
+
+[db]
+# Port to use for the local database URL.
+port = 54322
+# Port to use for the local database URL.
+shadow_port = 54320
+# The database major version to use. Has to be the same as your remote instance's major version.
+major_version = 15
+
+[studio]
+# Port to use for Supabase Studio.
+port = 54323
+
+# Email testing server. Emails sent with the local dev setup are not actually sent - rather, they are monitored, and you can view the emails that would have been sent from the web interface.
+[inbucket]
+# Port to use for the email testing server web interface.
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+# The maximum file size allowed (e.g. "5MB", "500KB").
+file_size_limit = "50MiB"
+
+[auth]
+# The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
+# in emails.
+site_url = "http://localhost:3000"
+# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
+additional_redirect_urls = ["https://localhost:3000"]
+# How long tokens are valid, in seconds. Default is 3600 (1 hour), maximum 604,800 (1 week).
+jwt_expiry = 3600
+# If disabled, users will not be able to sign up with email/password.
+enable_signup = true
+
+[edge_functions]
+# Port to use for the Edge Functions runtime.
+port = 54321
+
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+backend_port = 54329
