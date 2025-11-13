@@ -83,3 +83,6 @@ test_driver/
 .env
 supabase/functions/.env
 supabase/.env
+config/environments/.env.*.local
+config/environments/.env.local
+android/key.properties

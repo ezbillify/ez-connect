@@ -281,6 +281,15 @@ Available commands:
 - `types` - Generate TypeScript types
 - `shell` - Open database shell
 
+### `scripts/bootstrap_supabase_ci.sh`
+
+Used by CI and local test automation to:
+- Stop any running Supabase containers and restart the lightweight stack.
+- Wait for services to become available.
+- Apply all migrations and seed data via `supabase db reset`.
+
+This script is invoked automatically from `scripts/run_flutter_tests.sh` and the GitHub Actions workflow.
+
 ## 🔄 Maintenance
 
 ### Regular Tasks
