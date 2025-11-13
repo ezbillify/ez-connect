@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:app/data/services/realtime_channel_manager.dart';
 import 'package:app/data/services/realtime_event_dispatcher.dart';
 import 'package:app/domain/models/crm_entities.dart';
 import 'package:app/domain/models/realtime_event.dart';

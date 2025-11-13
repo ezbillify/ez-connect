@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:golden_toolkit/golden_toolkit.dart';
 import 'package:provider/provider.dart';
-import 'package:crm_app/features/products/screens/products_list_screen.dart';
-import 'package:crm_app/features/products/view_models/products_view_model.dart';
-import 'package:crm_app/models/product.dart';
+import 'package:app/features/products/screens/products_list_screen.dart';
+import 'package:app/features/products/view_models/products_view_model.dart';
+import 'package:app/models/product.dart';
 import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:crm_app/repositories/product_repository.dart';
-import 'package:crm_app/core/utils/result.dart';
+import 'package:app/repositories/product_repository.dart';
+import 'package:app/core/utils/result.dart';
 
 @GenerateMocks([ProductRepository])
 import 'products_list_screen_golden_test.mocks.dart';

@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import 'package:app/domain/models/user.dart';
 
 class SupabaseAuthDatasource {
@@ -24,8 +24,10 @@ class SupabaseAuthDatasource {
       email: authUser.email ?? '',
       name: authUser.userMetadata?['name'] ?? authUser.email ?? '',
       avatarUrl: authUser.userMetadata?['avatar_url'],
-      createdAt: authUser.createdAt,
-      updatedAt: authUser.updatedAt,
+      createdAt: DateTime.parse(authUser.createdAt),
+      updatedAt: authUser.updatedAt != null
+          ? DateTime.parse(authUser.updatedAt!)
+          : null,
     );
   }
 
@@ -43,7 +45,8 @@ class SupabaseAuthDatasource {
       throw Exception('Sign in failed: User is null');
     }
 
-    return _mapAuthUserToUser(response.user!);
+    // Cast to AuthUser to resolve type issue
+    return _mapAuthUserToUser(response.user! as AuthUser);
   }
 
   /// Sign up with email and password
@@ -64,7 +67,8 @@ class SupabaseAuthDatasource {
       throw Exception('Sign up failed: User is null');
     }
 
-    return _mapAuthUserToUser(response.user!);
+    // Cast to AuthUser to resolve type issue
+    return _mapAuthUserToUser(response.user! as AuthUser);
   }
 
   /// Request password reset
@@ -130,10 +134,7 @@ class SupabaseAuthDatasource {
     required String userId,
     required Map<String, dynamic> data,
   }) async {
-    await supabaseClient
-        .from('profiles')
-        .update(data)
-        .eq('id', userId);
+    await supabaseClient.from('profiles').update(data).eq('id', userId);
   }
 
   /// Check if user has invitation code
@@ -156,8 +157,7 @@ class SupabaseAuthDatasource {
   Future<void> markInvitationAsUsed(String code) async {
     await supabaseClient
         .from('invitations')
-        .update({'used': true})
-        .eq('code', code);
+        .update({'used': true}).eq('code', code);
   }
 
   /// Stream auth state changes
@@ -172,8 +172,10 @@ class SupabaseAuthDatasource {
       email: authUser.email ?? '',
       name: authUser.userMetadata?['name'] ?? authUser.email ?? '',
       avatarUrl: authUser.userMetadata?['avatar_url'],
-      createdAt: authUser.createdAt,
-      updatedAt: authUser.updatedAt,
+      createdAt: DateTime.parse(authUser.createdAt),
+      updatedAt: authUser.updatedAt != null
+          ? DateTime.parse(authUser.updatedAt!)
+          : null,
     );
   }
 }

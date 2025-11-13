@@ -42,17 +42,18 @@ class Env {
         );
         _isLoaded = true;
         _loadedFile = fileName;
-        _activeEnvironment =
-            dotenv.env['APP_ENVIRONMENT'] ?? targetEnvironment;
+        _activeEnvironment = dotenv.env['APP_ENVIRONMENT'] ?? targetEnvironment;
         return;
       } catch (_) {
         // ignore and continue to the next candidate
       }
     }
 
-    dotenv.testLoad(fileInput: {
-      'APP_ENVIRONMENT': targetEnvironment,
-    });
+    dotenv.testLoad(
+      fileInput: '''
+APP_ENVIRONMENT=$targetEnvironment
+''',
+    );
 
     _isLoaded = true;
     _loadedFile = null;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/result.dart';
 import '../../../models/customer.dart';
 import '../../../models/customer_interaction.dart';
 import '../../../repositories/customer_interaction_repository.dart';
@@ -178,8 +179,9 @@ class _AddInteractionScreenState extends State<AddInteractionScreen> {
       _isSaving = true;
     });
 
+    final uuid = const Uuid();
     final interaction = CustomerInteraction(
-      id: const Uuid().v4(),
+      id: uuid.v4(),
       customerId: widget.customer.id,
       type: _typeController.text.trim(),
       channel: _selectedChannel,
@@ -204,7 +206,8 @@ class _AddInteractionScreenState extends State<AddInteractionScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.errorOrNull?.message ?? 'Failed to save interaction'),
+            content: Text(
+                result.errorOrNull?.message ?? 'Failed to save interaction'),
             backgroundColor: Colors.red,
           ),
         );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/result.dart';
 import '../../../models/customer.dart';
 import '../../../models/customer_interaction.dart';
 import '../../../repositories/customer_interaction_repository.dart';
@@ -18,7 +19,8 @@ class InteractionsScreen extends StatefulWidget {
 }
 
 class _InteractionsScreenState extends State<InteractionsScreen> {
-  final CustomerInteractionRepository _repository = CustomerInteractionRepository();
+  final CustomerInteractionRepository _repository =
+      CustomerInteractionRepository();
   List<CustomerInteraction> _interactions = [];
   bool _isLoading = true;
 
@@ -36,8 +38,9 @@ class _InteractionsScreenState extends State<InteractionsScreen> {
   }
 
   Future<void> _loadInteractions() async {
-    final result = await _repository.getInteractionsByCustomerId(widget.customer.id);
-    
+    final result =
+        await _repository.getInteractionsByCustomerId(widget.customer.id);
+
     if (mounted) {
       setState(() {
         _isLoading = false;

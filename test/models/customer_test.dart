@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:crm_app/models/customer.dart';
+import 'package:app/models/customer.dart';
 
 void main() {
   group('Customer Model', () {
@@ -63,7 +63,8 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
-      final updated = customer.copyWith(status: 'qualified', email: 'newemail@example.com');
+      final updated =
+          customer.copyWith(status: 'qualified', email: 'newemail@example.com');
 
       expect(updated.id, customer.id);
       expect(updated.name, customer.name);

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/errors/app_error.dart';
+import '../../../core/utils/result.dart';
 import '../../../models/customer.dart';
 import '../../../repositories/customer_repository.dart';
 

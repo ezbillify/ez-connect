@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../core/constants/database_constants.dart';
@@ -13,7 +14,8 @@ class CustomerInteractionRepository {
   CustomerInteractionRepository({SupabaseClient? client})
       : _client = client ?? SupabaseConfig.client;
 
-  Future<Result<List<CustomerInteraction>>> getInteractionsByCustomerId(String customerId) async {
+  Future<Result<List<CustomerInteraction>>> getInteractionsByCustomerId(
+      String customerId) async {
     try {
       final response = await _client
           .from(DatabaseConstants.customerInteractionsTable)
@@ -35,7 +37,8 @@ class CustomerInteractionRepository {
     }
   }
 
-  Future<Result<CustomerInteraction>> createInteraction(CustomerInteraction interaction) async {
+  Future<Result<CustomerInteraction>> createInteraction(
+      CustomerInteraction interaction) async {
     try {
       final response = await _client
           .from(DatabaseConstants.customerInteractionsTable)
@@ -53,7 +56,8 @@ class CustomerInteractionRepository {
     }
   }
 
-  Future<Result<CustomerInteraction>> updateInteraction(CustomerInteraction interaction) async {
+  Future<Result<CustomerInteraction>> updateInteraction(
+      CustomerInteraction interaction) async {
     try {
       final response = await _client
           .from(DatabaseConstants.customerInteractionsTable)
@@ -98,7 +102,8 @@ class CustomerInteractionRepository {
         .eq('customer_id', customerId)
         .order('created_at', ascending: false)
         .listen((data) {
-          final interactions = data.map((json) => CustomerInteraction.fromJson(json)).toList();
+          final interactions =
+              data.map((json) => CustomerInteraction.fromJson(json)).toList();
           controller.add(interactions);
         });
 

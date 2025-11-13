@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import '../../../core/utils/result.dart';
 import '../../../repositories/customer_repository.dart';
 import '../../../models/customer.dart';
 import '../view_models/customers_view_model.dart';
@@ -32,7 +33,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
   Future<void> _loadCustomer() async {
     final repository = CustomerRepository();
     final result = await repository.getCustomerById(widget.customerId);
-    
+
     if (mounted) {
       setState(() {
         _isLoading = false;
@@ -108,7 +109,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                 CircleAvatar(
                   radius: 32,
                   child: Text(
-                    _customer!.name.isNotEmpty ? _customer!.name[0].toUpperCase() : '?',
+                    _customer!.name.isNotEmpty
+                        ? _customer!.name[0].toUpperCase()
+                        : '?',
                     style: const TextStyle(fontSize: 32),
                   ),
                 ),
@@ -143,14 +146,16 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
               const SizedBox(height: 12),
             ],
             if (_customer!.acquisitionSource != null) ...[
-              _buildInfoRow(Icons.source, 'Source', _customer!.acquisitionSource!),
+              _buildInfoRow(
+                  Icons.source, 'Source', _customer!.acquisitionSource!),
               const SizedBox(height: 12),
             ],
             if (_customer!.owner != null) ...[
               _buildInfoRow(Icons.person, 'Owner', _customer!.owner!),
               const SizedBox(height: 12),
             ],
-            _buildInfoRow(Icons.calendar_today, 'Created', dateFormat.format(_customer!.createdAt)),
+            _buildInfoRow(Icons.calendar_today, 'Created',
+                dateFormat.format(_customer!.createdAt)),
             const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: () {
@@ -238,7 +243,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
 
     if (confirmed == true && mounted) {
-      final success = await context.read<CustomersViewModel>().archiveCustomer(_customer!.id);
+      final success = await context
+          .read<CustomersViewModel>()
+          .archiveCustomer(_customer!.id);
       if (success && mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -253,7 +260,8 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Customer'),
-        content: Text('Are you sure you want to permanently delete "${_customer!.name}"?'),
+        content: Text(
+            'Are you sure you want to permanently delete "${_customer!.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -269,7 +277,9 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     );
 
     if (confirmed == true && mounted) {
-      final success = await context.read<CustomersViewModel>().deleteCustomer(_customer!.id);
+      final success = await context
+          .read<CustomersViewModel>()
+          .deleteCustomer(_customer!.id);
       if (success && mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../core/errors/app_error.dart';
+import '../../../core/utils/result.dart';
 import '../../../models/product.dart';
 import '../../../repositories/product_repository.dart';
 
@@ -18,7 +19,8 @@ class ProductsViewModel extends ChangeNotifier {
   List<Product> get products => _products;
   bool get isLoading => _isLoading;
   AppError? get error => _error;
-  List<Product> get activeProducts => _products.where((p) => p.isActive).toList();
+  List<Product> get activeProducts =>
+      _products.where((p) => p.isActive).toList();
 
   Future<void> loadProducts() async {
     _isLoading = true;

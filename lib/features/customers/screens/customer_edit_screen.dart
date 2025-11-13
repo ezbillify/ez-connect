@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/utils/result.dart';
 import '../../../models/customer.dart';
 import '../../../models/acquisition_stage.dart';
 import '../../../models/product.dart';
@@ -35,10 +36,14 @@ class _CustomerEditScreenState extends State<CustomerEditScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.customer?.name ?? '');
-    _emailController = TextEditingController(text: widget.customer?.email ?? '');
-    _phoneController = TextEditingController(text: widget.customer?.phone ?? '');
-    _acquisitionSourceController = TextEditingController(text: widget.customer?.acquisitionSource ?? '');
-    _ownerController = TextEditingController(text: widget.customer?.owner ?? '');
+    _emailController =
+        TextEditingController(text: widget.customer?.email ?? '');
+    _phoneController =
+        TextEditingController(text: widget.customer?.phone ?? '');
+    _acquisitionSourceController =
+        TextEditingController(text: widget.customer?.acquisitionSource ?? '');
+    _ownerController =
+        TextEditingController(text: widget.customer?.owner ?? '');
     _selectedProductId = widget.customer?.productId;
     _selectedStatus = widget.customer?.status ?? 'lead';
     _loadProducts();
@@ -216,18 +221,25 @@ class _CustomerEditScreenState extends State<CustomerEditScreen> {
 
     final viewModel = context.read<CustomersViewModel>();
     final now = DateTime.now();
+    final uuid = const Uuid();
 
     final customer = Customer(
-      id: widget.customer?.id ?? const Uuid().v4(),
+      id: widget.customer?.id ?? uuid.v4(),
       name: _nameController.text.trim(),
-      email: _emailController.text.trim().isEmpty ? null : _emailController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
+      email: _emailController.text.trim().isEmpty
+          ? null
+          : _emailController.text.trim(),
+      phone: _phoneController.text.trim().isEmpty
+          ? null
+          : _phoneController.text.trim(),
       productId: _selectedProductId,
       status: _selectedStatus,
       acquisitionSource: _acquisitionSourceController.text.trim().isEmpty
           ? null
           : _acquisitionSourceController.text.trim(),
-      owner: _ownerController.text.trim().isEmpty ? null : _ownerController.text.trim(),
+      owner: _ownerController.text.trim().isEmpty
+          ? null
+          : _ownerController.text.trim(),
       isArchived: widget.customer?.isArchived ?? false,
       createdAt: widget.customer?.createdAt ?? now,
       updatedAt: now,
@@ -246,13 +258,16 @@ class _CustomerEditScreenState extends State<CustomerEditScreen> {
         Navigator.pop(context, true);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.customer == null ? 'Customer created' : 'Customer updated'),
+            content: Text(widget.customer == null
+                ? 'Customer created'
+                : 'Customer updated'),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(viewModel.error?.message ?? 'Failed to save customer'),
+            content:
+                Text(viewModel.error?.message ?? 'Failed to save customer'),
             backgroundColor: Colors.red,
           ),
         );

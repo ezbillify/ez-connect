@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../core/constants/database_constants.dart';
@@ -20,9 +21,8 @@ class ProductRepository {
           .select()
           .order('created_at', ascending: false);
 
-      final products = (response as List)
-          .map((json) => Product.fromJson(json))
-          .toList();
+      final products =
+          (response as List).map((json) => Product.fromJson(json)).toList();
 
       return Success(products);
     } on SocketException {
@@ -62,7 +62,8 @@ class ProductRepository {
         if (activeCountResult.isFailure) {
           return Failure(activeCountResult.errorOrNull!);
         }
-        if (activeCountResult.dataOrNull! >= DatabaseConstants.maxActiveProducts) {
+        if (activeCountResult.dataOrNull! >=
+            DatabaseConstants.maxActiveProducts) {
           return const Failure(MaxProductsError());
         }
       }
@@ -86,11 +87,13 @@ class ProductRepository {
   Future<Result<Product>> updateProduct(Product product) async {
     try {
       if (product.isActive) {
-        final activeCountResult = await _getActiveProductCount(excludeId: product.id);
+        final activeCountResult =
+            await _getActiveProductCount(excludeId: product.id);
         if (activeCountResult.isFailure) {
           return Failure(activeCountResult.errorOrNull!);
         }
-        if (activeCountResult.dataOrNull! >= DatabaseConstants.maxActiveProducts) {
+        if (activeCountResult.dataOrNull! >=
+            DatabaseConstants.maxActiveProducts) {
           return const Failure(MaxProductsError());
         }
       }
@@ -114,10 +117,7 @@ class ProductRepository {
 
   Future<Result<void>> deleteProduct(String id) async {
     try {
-      await _client
-          .from(DatabaseConstants.productsTable)
-          .delete()
-          .eq('id', id);
+      await _client.from(DatabaseConstants.productsTable).delete().eq('id', id);
 
       return const Success(null);
     } on SocketException {

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:crm_app/models/product.dart';
+import 'package:app/models/product.dart';
 
 void main() {
   group('Product Model', () {
@@ -49,7 +49,8 @@ void main() {
         updatedAt: DateTime.now(),
       );
 
-      final updated = product.copyWith(name: 'Updated Product', isActive: false);
+      final updated =
+          product.copyWith(name: 'Updated Product', isActive: false);
 
       expect(updated.id, product.id);
       expect(updated.name, 'Updated Product');

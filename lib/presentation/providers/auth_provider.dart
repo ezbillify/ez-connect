@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:gotrue/gotrue.dart' hide Provider;
 import 'package:supabase_flutter/supabase_flutter.dart' hide Provider;
+import 'package:gotrue/gotrue.dart' hide Provider;
 import 'package:app/data/datasources/supabase_auth_datasource.dart';
 import 'package:app/data/repositories/auth_repository_impl.dart';
 import 'package:app/domain/models/auth_state.dart' as auth_state_model;
@@ -22,12 +21,12 @@ final supabaseAuthDatasourceProvider = Provider<SupabaseAuthDatasource>((ref) {
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final datasource = ref.watch(supabaseAuthDatasourceProvider);
   final repository = AuthRepositoryImpl(datasource: datasource);
-  
+
   // Initialize session on first access
   ref.onDispose(() {
     repository.dispose();
   });
-  
+
   return repository;
 });
 
@@ -35,9 +34,11 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
   final AuthRepository authRepository;
 
-  AuthNotifier({required this.authRepository}) : super(
-    auth_state_model.AuthState(status: auth_state_model.AuthStatus.initial),
-  ) {
+  AuthNotifier({required this.authRepository})
+      : super(
+          auth_state_model.AuthState(
+              status: auth_state_model.AuthStatus.initial),
+        ) {
     _initialize();
   }
 
@@ -45,7 +46,7 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
     try {
       state = state.copyWith(status: auth_state_model.AuthStatus.loading);
       await authRepository.initializeSession();
-      
+
       final user = authRepository.getCurrentUser();
       if (user != null) {
         final role = await authRepository.getUserRole();
@@ -55,7 +56,8 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
           userRole: role,
         );
       } else {
-        state = state.copyWith(status: auth_state_model.AuthStatus.unauthenticated);
+        state =
+            state.copyWith(status: auth_state_model.AuthStatus.unauthenticated);
       }
     } catch (e) {
       state = state.copyWith(
@@ -70,7 +72,8 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
     required String password,
   }) async {
     try {
-      state = state.copyWith(status: auth_state_model.AuthStatus.loading, error: null);
+      state = state.copyWith(
+          status: auth_state_model.AuthStatus.loading, error: null);
       final user = await authRepository.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -98,7 +101,8 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
     String? invitationCode,
   }) async {
     try {
-      state = state.copyWith(status: auth_state_model.AuthStatus.loading, error: null);
+      state = state.copyWith(
+          status: auth_state_model.AuthStatus.loading, error: null);
       final user = await authRepository.signUpWithEmailAndPassword(
         email: email,
         password: password,
@@ -179,7 +183,8 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
 }
 
 /// Provider for auth state
-final authProvider = StateNotifierProvider<AuthNotifier, auth_state_model.AuthState>((ref) {
+final authProvider =
+    StateNotifierProvider<AuthNotifier, auth_state_model.AuthState>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
   return AuthNotifier(authRepository: authRepository);
 });

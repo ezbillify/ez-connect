@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../core/config/supabase_config.dart';
 import '../core/constants/database_constants.dart';
@@ -20,16 +21,15 @@ class CustomerRepository {
     String? status,
   }) async {
     try {
-      var query = _client
-          .from(DatabaseConstants.customersTable)
-          .select();
+      var query = _client.from(DatabaseConstants.customersTable).select();
 
       if (!includeArchived) {
         query = query.eq('is_archived', false);
       }
 
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        query = query.or('name.ilike.%$searchQuery%,email.ilike.%$searchQuery%,phone.ilike.%$searchQuery%');
+        query = query.or(
+            'name.ilike.%$searchQuery%,email.ilike.%$searchQuery%,phone.ilike.%$searchQuery%');
       }
 
       if (productId != null) {
@@ -42,9 +42,8 @@ class CustomerRepository {
 
       final response = await query.order('created_at', ascending: false);
 
-      final customers = (response as List)
-          .map((json) => Customer.fromJson(json))
-          .toList();
+      final customers =
+          (response as List).map((json) => Customer.fromJson(json)).toList();
 
       return Success(customers);
     } on SocketException {
@@ -116,10 +115,10 @@ class CustomerRepository {
 
   Future<Result<void>> archiveCustomer(String id) async {
     try {
-      await _client
-          .from(DatabaseConstants.customersTable)
-          .update({'is_archived': true, 'updated_at': DateTime.now().toIso8601String()})
-          .eq('id', id);
+      await _client.from(DatabaseConstants.customersTable).update({
+        'is_archived': true,
+        'updated_at': DateTime.now().toIso8601String()
+      }).eq('id', id);
 
       return const Success(null);
     } on SocketException {
@@ -166,12 +165,11 @@ class CustomerRepository {
       queryBuilder = queryBuilder.eq('product_id', productId);
     }
 
-    _subscription = queryBuilder
-        .order('created_at', ascending: false)
-        .listen((data) {
-          final customers = data.map((json) => Customer.fromJson(json)).toList();
-          controller.add(customers);
-        });
+    _subscription =
+        queryBuilder.order('created_at', ascending: false).listen((data) {
+      final customers = data.map((json) => Customer.fromJson(json)).toList();
+      controller.add(customers);
+    });
 
     return controller.stream;
   }

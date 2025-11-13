@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:crm_app/features/products/widgets/product_list_item.dart';
-import 'package:crm_app/models/product.dart';
+import 'package:app/features/products/widgets/product_list_item.dart';
+import 'package:app/models/product.dart';
 
 void main() {
   group('ProductListItem Widget', () {

@@ -7,6 +7,15 @@ import 'package:app/data/repositories/ticketing_realtime_repository.dart';
 import 'package:app/domain/models/realtime_event.dart';
 import 'package:app/presentation/providers/auth_provider.dart';
 
+/// Realtime connection status enum
+enum RealtimeConnectionStatus {
+  disconnected,
+  connecting,
+  connected,
+  reconnecting,
+  error,
+}
+
 /// Realtime channel manager provider
 final realtimeChannelManagerProvider = Provider<RealtimeChannelManager>((ref) {
   final supabase = ref.watch(supabaseProvider);
@@ -14,7 +23,8 @@ final realtimeChannelManagerProvider = Provider<RealtimeChannelManager>((ref) {
 });
 
 /// Realtime event dispatcher provider
-final realtimeEventDispatcherProvider = Provider<RealtimeEventDispatcher>((ref) {
+final realtimeEventDispatcherProvider =
+    Provider<RealtimeEventDispatcher>((ref) {
   return RealtimeEventDispatcher();
 });
 
@@ -29,7 +39,8 @@ final crmRealtimeRepositoryProvider = Provider<CrmRealtimeRepository>((ref) {
 });
 
 /// Ticketing realtime repository provider
-final ticketingRealtimeRepositoryProvider = Provider<TicketingRealtimeRepository>((ref) {
+final ticketingRealtimeRepositoryProvider =
+    Provider<TicketingRealtimeRepository>((ref) {
   final channelManager = ref.watch(realtimeChannelManagerProvider);
   final dispatcher = ref.watch(realtimeEventDispatcherProvider);
   return TicketingRealtimeRepository(
@@ -39,7 +50,8 @@ final ticketingRealtimeRepositoryProvider = Provider<TicketingRealtimeRepository
 });
 
 /// Realtime connection status notifier
-class RealtimeConnectionNotifier extends StateNotifier<RealtimeConnectionStatus> {
+class RealtimeConnectionNotifier
+    extends StateNotifier<RealtimeConnectionStatus> {
   final RealtimeChannelManager channelManager;
   final Ref ref;
 
@@ -76,7 +88,8 @@ class RealtimeConnectionNotifier extends StateNotifier<RealtimeConnectionStatus>
 
 /// Realtime connection status provider
 final realtimeConnectionStatusProvider =
-    StateNotifierProvider<RealtimeConnectionNotifier, RealtimeConnectionStatus>((ref) {
+    StateNotifierProvider<RealtimeConnectionNotifier, RealtimeConnectionStatus>(
+        (ref) {
   final channelManager = ref.watch(realtimeChannelManagerProvider);
   return RealtimeConnectionNotifier(
     channelManager: channelManager,
@@ -102,7 +115,8 @@ class RealtimeInitializationNotifier extends StateNotifier<AsyncValue<void>> {
 
       final crmRepo = ref.read(crmRealtimeRepositoryProvider);
       final ticketingRepo = ref.read(ticketingRealtimeRepositoryProvider);
-      final connectionNotifier = ref.read(realtimeConnectionStatusProvider.notifier);
+      final connectionNotifier =
+          ref.read(realtimeConnectionStatusProvider.notifier);
 
       connectionNotifier.connect();
 
@@ -133,7 +147,8 @@ class RealtimeInitializationNotifier extends StateNotifier<AsyncValue<void>> {
 
 /// Realtime initialization provider
 final realtimeInitializationProvider =
-    StateNotifierProvider<RealtimeInitializationNotifier, AsyncValue<void>>((ref) {
+    StateNotifierProvider<RealtimeInitializationNotifier, AsyncValue<void>>(
+        (ref) {
   return RealtimeInitializationNotifier(ref: ref);
 });
 
@@ -154,7 +169,7 @@ final subscribedTablesProvider = Provider<List<String>>((ref) {
 });
 
 /// Check if a specific table is subscribed
-final isTableSubscribedProvider = FamilyProvider<bool, String>((ref, table) {
+final isTableSubscribedProvider = Provider.family<bool, String>((ref, table) {
   final channelManager = ref.watch(realtimeChannelManagerProvider);
   return channelManager.isSubscribed(table);
 });
