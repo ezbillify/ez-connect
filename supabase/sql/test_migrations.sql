@@ -14,8 +14,8 @@ BEGIN
         'profiles', 'products', 'acquisition_stages', 'customers', 
         'customer_interactions', 'tickets', 'ticket_workflow_history',
         'ticket_assignees', 'ticket_comments', 'integration_tokens',
-        'audit_history', 'ticket_attachments'
-    )) = 12, 'Not all tables created';
+        'audit_history', 'ticket_attachments', 'user_invitations'
+    )) = 13, 'Not all tables created';
     
     -- Check all views exist
     ASSERT (SELECT COUNT(*) FROM pg_views WHERE schemaname = 'public' AND viewname IN (
@@ -65,8 +65,8 @@ BEGIN
                 'profiles', 'products', 'acquisition_stages', 'customers',
                 'customer_interactions', 'tickets', 'ticket_workflow_history',
                 'ticket_assignees', 'ticket_comments', 'integration_tokens',
-                'audit_history', 'ticket_attachments'
-            )) = 12, 'RLS not enabled on all tables';
+                'audit_history', 'ticket_attachments', 'user_invitations'
+            )) = 13, 'RLS not enabled on all tables';
     
     -- Check policies exist
     SELECT COUNT(*) INTO policy_count FROM pg_policies WHERE schemaname = 'public';
@@ -247,10 +247,93 @@ BEGIN
 END $$;
 
 -- ===========================================
+-- 12. Test RBAC Extensions
+-- ===========================================
+
+DO $
+DECLARE
+    user_role_count INTEGER;
+    user_status_exists BOOLEAN;
+    invitation_count INTEGER;
+BEGIN
+    RAISE NOTICE 'Testing RBAC extensions...';
+    
+    -- Check user_role enum has all values
+    SELECT COUNT(*) INTO user_role_count
+    FROM pg_enum e
+    JOIN pg_type t ON e.enumtypid = t.oid
+    WHERE t.typname = 'user_role'
+    AND e.enumlabel IN ('admin', 'agent', 'customer', 'guest');
+    
+    ASSERT user_role_count = 4, 'user_role enum does not have all required values';
+    
+    -- Check user_status enum exists
+    SELECT EXISTS (
+        SELECT 1 FROM pg_type WHERE typname = 'user_status'
+    ) INTO user_status_exists;
+    
+    ASSERT user_status_exists = true, 'user_status enum not created';
+    
+    -- Check profiles has status column
+    ASSERT (SELECT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public'
+        AND table_name = 'profiles'
+        AND column_name = 'status'
+    )), 'profiles.status column not found';
+    
+    -- Check user_invitations table exists and has records
+    SELECT COUNT(*) INTO invitation_count FROM user_invitations;
+    ASSERT invitation_count >= 4, 'Sample invitations not created';
+    
+    -- Check invitation-related functions exist
+    ASSERT (SELECT COUNT(*) FROM pg_proc p
+            JOIN pg_namespace n ON p.pronamespace = n.oid
+            WHERE n.nspname = 'public'
+            AND p.proname IN (
+                'generate_invitation_code',
+                'create_invitation',
+                'accept_invitation',
+                'expire_old_invitations',
+                'update_last_active'
+            )) = 5, 'Not all invitation functions created';
+    
+    RAISE NOTICE '✓ RBAC extension tests passed';
+END $;
+
+-- ===========================================
+-- 13. Test User Status and Invitations
+-- ===========================================
+
+DO $
+DECLARE
+    admin_status user_status;
+    pending_invitations INTEGER;
+BEGIN
+    RAISE NOTICE 'Testing user status and invitations...';
+    
+    -- Check admin user has active status
+    SELECT status INTO admin_status 
+    FROM profiles 
+    WHERE email = 'admin@ezbillify.com';
+    
+    ASSERT admin_status = 'active', 'Admin user does not have active status';
+    
+    -- Check pending invitations exist
+    SELECT COUNT(*) INTO pending_invitations
+    FROM user_invitations
+    WHERE status = 'pending' AND expires_at > NOW();
+    
+    ASSERT pending_invitations >= 4, 'Pending invitations not found';
+    
+    RAISE NOTICE '✓ User status and invitation tests passed';
+END $;
+
+-- ===========================================
 -- Summary
 -- ===========================================
 
-DO $$
+DO $
 BEGIN
     RAISE NOTICE '';
     RAISE NOTICE '===========================================';
@@ -263,9 +346,14 @@ BEGIN
     RAISE NOTICE '  Email: admin@ezbillify.com';
     RAISE NOTICE '  Password: admin123';
     RAISE NOTICE '';
+    RAISE NOTICE 'RBAC Features:';
+    RAISE NOTICE '  - Roles: admin, agent, customer, guest';
+    RAISE NOTICE '  - Status: active, disabled, invited, pending';
+    RAISE NOTICE '  - Invitations: System ready for user onboarding';
+    RAISE NOTICE '';
     RAISE NOTICE 'IMPORTANT: Change admin password in production!';
     RAISE NOTICE '';
-END $$;
+END $;
 
 -- Optional: Display some useful statistics
 SELECT 

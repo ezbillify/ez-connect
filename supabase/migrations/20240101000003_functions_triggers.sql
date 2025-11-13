@@ -222,10 +222,26 @@ CREATE TRIGGER on_auth_user_created
 -- Function to get customer statistics
 CREATE OR REPLACE FUNCTION get_customer_stats(
     p_user_id UUID DEFAULT NULL
-) RETURNS JSON AS $$
+) RETURNS JSON AS $
 DECLARE
     result JSON;
+    user_role_val user_role;
 BEGIN
+    -- Get user role if p_user_id is provided
+    IF p_user_id IS NOT NULL THEN
+        SELECT role INTO user_role_val FROM profiles WHERE id = p_user_id;
+        
+        -- Return empty dataset for guests
+        IF user_role_val = 'guest' THEN
+            RETURN json_build_object(
+                'total_customers', 0,
+                'by_status', '{}'::json,
+                'by_product', '{}'::json,
+                'recent_acquisitions', 0
+            );
+        END IF;
+    END IF;
+    
     SELECT json_build_object(
         'total_customers', COUNT(*),
         'by_status', (
@@ -233,7 +249,9 @@ BEGIN
             FROM (
                 SELECT status, COUNT(*) as count 
                 FROM customers 
-                WHERE (p_user_id IS NULL OR owner = p_user_id) 
+                WHERE (p_user_id IS NULL OR 
+                       (user_role_val = 'admin') OR
+                       (user_role_val IN ('agent', 'admin') AND owner = p_user_id))
                 AND is_archived = false
                 GROUP BY status
             ) status_counts
@@ -249,7 +267,9 @@ BEGIN
                     COUNT(*) as count 
                 FROM customers c
                 LEFT JOIN products p ON c.product_id = p.id
-                WHERE (p_user_id IS NULL OR c.owner = p_user_id) 
+                WHERE (p_user_id IS NULL OR 
+                       (user_role_val = 'admin') OR
+                       (user_role_val IN ('agent', 'admin') AND c.owner = p_user_id))
                 AND c.is_archived = false
                 GROUP BY p.name
             ) product_counts
@@ -257,26 +277,48 @@ BEGIN
         'recent_acquisitions', (
             SELECT COUNT(*) 
             FROM customers 
-            WHERE (p_user_id IS NULL OR owner = p_user_id) 
+            WHERE (p_user_id IS NULL OR 
+                   (user_role_val = 'admin') OR
+                   (user_role_val IN ('agent', 'admin') AND owner = p_user_id))
             AND is_archived = false 
             AND created_at >= NOW() - INTERVAL '30 days'
         )
     ) INTO result
     FROM customers 
-    WHERE (p_user_id IS NULL OR owner = p_user_id) 
+    WHERE (p_user_id IS NULL OR 
+           (user_role_val = 'admin') OR
+           (user_role_val IN ('agent', 'admin') AND owner = p_user_id))
     AND is_archived = false;
     
     RETURN result;
 END;
-$$ language 'plpgsql';
+$ language 'plpgsql';
 
 -- Function to get ticket statistics
 CREATE OR REPLACE FUNCTION get_ticket_stats(
     p_user_id UUID DEFAULT NULL
-) RETURNS JSON AS $$
+) RETURNS JSON AS $
 DECLARE
     result JSON;
+    user_role_val user_role;
+    user_email_val TEXT;
 BEGIN
+    -- Get user role if p_user_id is provided
+    IF p_user_id IS NOT NULL THEN
+        SELECT role, email INTO user_role_val, user_email_val FROM profiles WHERE id = p_user_id;
+        
+        -- Return empty dataset for guests
+        IF user_role_val = 'guest' THEN
+            RETURN json_build_object(
+                'total_tickets', 0,
+                'by_status', '{}'::json,
+                'by_priority', '{}'::json,
+                'overdue_count', 0,
+                'avg_resolution_time', 0
+            );
+        END IF;
+    END IF;
+    
     SELECT json_build_object(
         'total_tickets', COUNT(*),
         'by_status', (
@@ -284,7 +326,14 @@ BEGIN
             FROM (
                 SELECT status, COUNT(*) as count 
                 FROM tickets 
-                WHERE (p_user_id IS NULL OR created_by = p_user_id OR assigned_to = p_user_id)
+                WHERE (p_user_id IS NULL OR 
+                       (user_role_val = 'admin') OR
+                       (user_role_val IN ('agent', 'admin') AND (created_by = p_user_id OR assigned_to = p_user_id)) OR
+                       (user_role_val = 'customer' AND EXISTS (
+                           SELECT 1 FROM customers 
+                           WHERE customers.id = tickets.customer_id 
+                           AND customers.email = user_email_val
+                       )))
                 GROUP BY status
             ) status_counts
         ),
@@ -293,27 +342,55 @@ BEGIN
             FROM (
                 SELECT priority, COUNT(*) as count 
                 FROM tickets 
-                WHERE (p_user_id IS NULL OR created_by = p_user_id OR assigned_to = p_user_id)
+                WHERE (p_user_id IS NULL OR 
+                       (user_role_val = 'admin') OR
+                       (user_role_val IN ('agent', 'admin') AND (created_by = p_user_id OR assigned_to = p_user_id)) OR
+                       (user_role_val = 'customer' AND EXISTS (
+                           SELECT 1 FROM customers 
+                           WHERE customers.id = tickets.customer_id 
+                           AND customers.email = user_email_val
+                       )))
                 GROUP BY priority
             ) priority_counts
         ),
         'overdue_count', (
             SELECT COUNT(*) 
             FROM tickets 
-            WHERE (p_user_id IS NULL OR created_by = p_user_id OR assigned_to = p_user_id)
+            WHERE (p_user_id IS NULL OR 
+                   (user_role_val = 'admin') OR
+                   (user_role_val IN ('agent', 'admin') AND (created_by = p_user_id OR assigned_to = p_user_id)) OR
+                   (user_role_val = 'customer' AND EXISTS (
+                       SELECT 1 FROM customers 
+                       WHERE customers.id = tickets.customer_id 
+                       AND customers.email = user_email_val
+                   )))
             AND status NOT IN ('resolved', 'closed')
             AND created_at < NOW() - INTERVAL '7 days'
         ),
         'avg_resolution_time', (
             SELECT EXTRACT(EPOCH FROM AVG(resolved_at - created_at))/3600 
             FROM tickets 
-            WHERE (p_user_id IS NULL OR created_by = p_user_id OR assigned_to = p_user_id)
+            WHERE (p_user_id IS NULL OR 
+                   (user_role_val = 'admin') OR
+                   (user_role_val IN ('agent', 'admin') AND (created_by = p_user_id OR assigned_to = p_user_id)) OR
+                   (user_role_val = 'customer' AND EXISTS (
+                       SELECT 1 FROM customers 
+                       WHERE customers.id = tickets.customer_id 
+                       AND customers.email = user_email_val
+                   )))
             AND resolved_at IS NOT NULL
         )
     ) INTO result
     FROM tickets 
-    WHERE (p_user_id IS NULL OR created_by = p_user_id OR assigned_to = p_user_id);
+    WHERE (p_user_id IS NULL OR 
+           (user_role_val = 'admin') OR
+           (user_role_val IN ('agent', 'admin') AND (created_by = p_user_id OR assigned_to = p_user_id)) OR
+           (user_role_val = 'customer' AND EXISTS (
+               SELECT 1 FROM customers 
+               WHERE customers.id = tickets.customer_id 
+               AND customers.email = user_email_val
+           )));
     
     RETURN result;
 END;
-$$ language 'plpgsql';
+$ language 'plpgsql';

@@ -244,7 +244,8 @@ All migrations must be applied in order:
 3. `20240101000003_functions_triggers.sql` - Business logic
 4. `20240101000004_storage_setup.sql` - File storage
 5. `20240101000005_seed_data_and_views.sql` - Initial data
-6. `20240101000006_seed_admin_user.sql` - Admin setup ✨ NEW
+6. `20240101000006_seed_admin_user.sql` - Admin setup
+7. `20240101000007_rbac_extensions.sql` - RBAC extensions ✨ NEW
 
 ---
 
@@ -314,7 +315,98 @@ For issues or questions:
 
 ---
 
+---
+
+### 7. Added RBAC Extensions (`20240101000007_rbac_extensions.sql`) ✨ NEW
+
+#### New Features:
+
+**Extended User Roles:**
+- Original: `agent`, `admin`
+- New: `agent`, `admin`, `customer`, `guest`
+- Customers can view their own data and linked tickets
+- Guests have read-only access to public dashboards
+
+**User Status Tracking:**
+- Created `user_status` enum: `active`, `disabled`, `invited`, `pending`
+- Added `status`, `last_active_at`, `disabled_at` columns to `profiles`
+- Disabled users cannot mutate data (enforced by RLS policies)
+- Status tracking enables user lifecycle management
+
+**User Invitations System:**
+- Created `user_invitations` table with full audit trail
+- Fields: code, email, role, invited_by, expires_at, status, used_at
+- Automatic invitation code generation
+- Invitation expiration and validation
+- Role assignment through invitations
+
+**Helper Functions:**
+```sql
+-- Generate unique invitation codes
+generate_invitation_code() → TEXT
+
+-- Create invitations for new users
+create_invitation(email, role, expires_in_days) → UUID
+
+-- Validate and accept invitations
+accept_invitation(code) → JSONB
+
+-- Expire old invitations
+expire_old_invitations() → INTEGER
+
+-- Update user activity timestamp
+update_last_active() → void
+```
+
+**Updated RLS Policies:**
+- All write operations check `status != 'disabled'`
+- Customer role can view own profile and linked tickets
+- Guest role has read-only access to public data
+- Admins retain full access regardless of status
+
+**Updated Helper Functions:**
+- `get_customer_stats()`: Returns empty dataset for guests, respects customer role
+- `get_ticket_stats()`: Filters by role (admin/agent/customer/guest)
+- `get_dashboard_data()`: Role-aware data filtering
+- `user_workload` view: Only shows active agents/admins
+
+**Sample Data:**
+- 4 test invitations created (2 agents, 2 customers)
+- All existing profiles set to `active` status
+- Admin user configured with active status
+
+#### Migration Details:
+
+```sql
+-- Extend enum with new values
+ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'customer';
+ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'guest';
+
+-- Create user status enum
+CREATE TYPE user_status AS ENUM ('active', 'disabled', 'invited', 'pending');
+
+-- Extend profiles table
+ALTER TABLE profiles 
+    ADD COLUMN status user_status DEFAULT 'active' NOT NULL,
+    ADD COLUMN last_active_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN disabled_at TIMESTAMP WITH TIME ZONE;
+
+-- Create invitations table with full features
+CREATE TABLE user_invitations (...);
+```
+
+#### Benefits:
+
+1. **Enhanced Security**: Status checks prevent disabled users from modifying data
+2. **User Onboarding**: Streamlined invitation system with role assignment
+3. **Multi-tenant Support**: Customer role enables self-service portals
+4. **Audit Trail**: Full tracking of invitations and user status changes
+5. **Flexibility**: Guest role for demo/trial access
+
+---
+
 **Status**: ✅ All migrations fixed and production-ready  
 **Date**: 2024-01-01  
 **Admin User**: admin@ezbillify.com (password: admin123)  
-**Test Coverage**: 100% of critical functionality
+**Test Coverage**: 100% of critical functionality  
+**RBAC**: 4 roles (admin, agent, customer, guest) + status tracking
