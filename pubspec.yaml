@@ -52,6 +52,10 @@ dependencies:
   # Form Handling
   reactive_forms: ^16.0.0
 
+  # Utilities
+  intl: ^0.18.1
+  crypto: ^3.0.3
+
   # UI Components & Utilities
   gap: ^3.0.1
   iconsax_flutter: ^1.0.1

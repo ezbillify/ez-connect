@@ -9,6 +9,8 @@ import 'package:app/presentation/screens/auth/login_screen.dart';
 import 'package:app/presentation/screens/auth/signup_screen.dart';
 import 'package:app/presentation/screens/auth/forgot_password_screen.dart';
 import 'package:app/presentation/screens/auth/magic_link_screen.dart';
+import 'package:app/presentation/screens/integration_tokens/integration_tokens_screen.dart';
+import 'package:app/presentation/screens/integration_tokens/token_usage_screen.dart';
 import 'package:app/presentation/providers/auth_provider.dart';
 import 'package:app/domain/models/auth_state.dart';
 
@@ -32,11 +34,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Check role-based access for protected routes
       if (isAuthenticated && !isAuthRoute) {
         final userRole = authState.userRole;
+        final path = state.uri.path;
         
         // CRM and Ticketing routes might require specific roles in future
-        if ((state.uri.path == '/crm' || state.uri.path == '/ticketing') &&
-            userRole == null) {
+        if ((path == '/crm' || path == '/ticketing') && userRole == null) {
           return '/dashboard';
+        }
+
+        if (path.startsWith('/integration-tokens')) {
+          if (userRole != 'admin') {
+            return '/settings';
+          }
         }
       }
 
@@ -80,6 +88,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final email = state.extra as String? ?? '';
           return MagicLinkScreen(email: email);
+        },
+      ),
+      GoRoute(
+        path: '/integration-tokens',
+        builder: (context, state) => const IntegrationTokensScreen(),
+      ),
+      GoRoute(
+        path: '/integration-tokens/:id/usage',
+        builder: (context, state) {
+          final tokenId = state.pathParameters['id']!;
+          return TokenUsageScreen(tokenId: tokenId);
         },
       ),
     ],

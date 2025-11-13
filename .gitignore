@@ -81,8 +81,5 @@ test_driver/
 
 # Environment files
 .env
-.env.local
-.env.*.local
-
-# Golden test files (optional, comment out if you want to version them)
-# test/**/goldens/**/*.png
+supabase/functions/.env
+supabase/.env

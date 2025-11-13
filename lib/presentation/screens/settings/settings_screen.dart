@@ -123,6 +123,25 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ),
                 const Gap(24),
+                if (userRole == 'admin') ...[
+                  Text(
+                    'Administration',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const Gap(16),
+                  Card(
+                    child: ListTile(
+                      leading: const Icon(Icons.integration_instructions),
+                      title: const Text('Integration Tokens'),
+                      subtitle: const Text('Manage API tokens for external integrations'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () {
+                        context.go('/integration-tokens');
+                      },
+                    ),
+                  ),
+                  const Gap(24),
+                ],
                 Text(
                   'Account',
                   style: Theme.of(context).textTheme.titleLarge,

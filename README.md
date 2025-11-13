@@ -8,7 +8,7 @@ A modern Flutter application configured for web, iOS, and Android targets with a
 - **Clean Architecture**: Organized into presentation, domain, and data layers
 - **State Management**: Riverpod for reactive state management
 - **Routing**: GoRouter for declarative navigation
-- **Backend Integration**: Supabase for authentication and data management
+- **Backend Integration**: Supabase for authentication, data management, and secure external APIs
 - **Environment Configuration**: Secure environment variable management
 - **Modern UI**: Google Fonts, responsive design helpers, and customizable themes
 - **Form Handling**: Reactive Forms for complex form management
@@ -414,6 +414,21 @@ flutter test
 - Create App Store Connect account
 - Configure certificates and provisioning profiles
 - Use TestFlight for beta testing
+
+## External Integrations
+
+The application supports secure token-based integration for external systems to create and manage tickets programmatically.
+
+**For Developers:**
+- See [External Integrations Guide](docs/EXTERNAL_INTEGRATIONS.md) for setup and deployment
+- Follow the [Integration Setup Guide](INTEGRATION_SETUP.md) for a step-by-step walkthrough
+- See [API Integration Reference](docs/API_INTEGRATION.md) for API documentation
+- Check [examples/](examples/) for client code samples
+
+**For Administrators:**
+- Navigate to Settings → Integration Tokens to manage API tokens
+- Issue, regenerate, disable, and monitor integration tokens
+- View detailed usage logs and statistics
 
 ## Resources
 
