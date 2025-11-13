@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app/shared/theme/app_theme.dart';
 import 'package:app/presentation/providers/router_provider.dart';
 import 'package:app/shared/utils/env.dart';
+import 'package:app/presentation/providers/realtime_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,7 @@ class MyApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    ref.watch(realtimeSetupProvider);
 
     return MaterialApp.router(
       title: 'App',
