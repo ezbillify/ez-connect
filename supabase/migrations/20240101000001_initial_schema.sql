@@ -47,6 +47,11 @@ CREATE TYPE user_role AS ENUM (
 -- Create extension for UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Explicitly ensure the function exists
+CREATE OR REPLACE FUNCTION uuid_generate_v4()
+RETURNS uuid AS 'uuid-ossp', 'uuid_generate_v4'
+LANGUAGE c IMMUTABLE STRICT;
+
 -- Create profiles table (extends auth.users)
 CREATE TABLE profiles (
     id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,

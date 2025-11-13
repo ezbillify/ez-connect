@@ -65,7 +65,7 @@ class _AddInteractionScreenState extends State<AddInteractionScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<InteractionChannel>(
-              value: _selectedChannel,
+              initialValue: _selectedChannel,
               decoration: const InputDecoration(
                 labelText: 'Channel',
                 border: OutlineInputBorder(),

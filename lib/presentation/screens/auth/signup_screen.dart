@@ -19,7 +19,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   late TextEditingController _invitationCodeController;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  bool _requiresInvitation = true;
+  final bool _requiresInvitation = true;
 
   @override
   void initState() {

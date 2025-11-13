@@ -29,7 +29,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),
@@ -50,7 +50,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),
@@ -69,7 +69,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),
@@ -93,7 +93,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),
@@ -111,7 +111,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),
@@ -129,7 +129,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),
@@ -153,7 +153,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),
@@ -197,7 +197,7 @@ void main() {
           overrides: [
             authRepositoryProvider.overrideWithValue(mockAuthRepository),
           ],
-          child: MaterialApp(
+          child: const MaterialApp(
             home: Scaffold(
               body: LoginScreen(),
             ),

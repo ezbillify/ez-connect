@@ -19,7 +19,7 @@ class ProductListItem extends StatelessWidget {
         onTap: onTap,
         leading: CircleAvatar(
           backgroundColor: product.isActive ? Colors.green : Colors.grey,
-          child: Icon(
+          child: const Icon(
             Icons.inventory_2,
             color: Colors.white,
           ),

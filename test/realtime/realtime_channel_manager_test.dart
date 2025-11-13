@@ -35,7 +35,7 @@ void main() {
         onEvent: (_) {},
       );
 
-      await Future.delayed(Duration(milliseconds: 100));
+      await Future.delayed(const Duration(milliseconds: 100));
       await channelManager.closeAll();
 
       expect(channelManager.getSubscribedTables().isEmpty, true);
