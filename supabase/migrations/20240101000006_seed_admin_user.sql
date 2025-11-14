@@ -23,11 +23,14 @@ BEGIN
         RAISE NOTICE 'Admin user already exists, skipping creation';
         
         -- Make sure the profile exists with admin role
-        INSERT INTO public.profiles (id, email, full_name, role)
-        SELECT id, email, 'System Administrator', 'admin'
+        INSERT INTO public.profiles (id, email, full_name, role, status, last_active_at)
+        SELECT id, email, 'System Administrator', 'admin', 'active', NOW()
         FROM auth.users
         WHERE email = 'admin@ezbillify.com'
-        ON CONFLICT (id) DO UPDATE SET role = 'admin';
+        ON CONFLICT (id) DO UPDATE SET 
+            role = 'admin',
+            status = 'active',
+            last_active_at = NOW();
         
         RETURN;
     END IF;
@@ -76,14 +79,19 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
     
     -- Create profile for admin user (this should be automatic via trigger, but we ensure it here)
-    INSERT INTO public.profiles (id, email, full_name, role)
+    INSERT INTO public.profiles (id, email, full_name, role, status, last_active_at)
     VALUES (
         admin_user_id,
         'admin@ezbillify.com',
         'System Administrator',
-        'admin'
+        'admin',
+        'active',
+        NOW()
     )
-    ON CONFLICT (id) DO UPDATE SET role = 'admin';
+    ON CONFLICT (id) DO UPDATE SET 
+        role = 'admin',
+        status = 'active',
+        last_active_at = NOW();
     
     RAISE NOTICE 'Admin user created successfully: admin@ezbillify.com';
 END;

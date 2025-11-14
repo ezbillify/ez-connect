@@ -82,26 +82,36 @@ CREATE POLICY "Users can update own profile" ON profiles
   USING (auth.uid() = id);
 ```
 
-#### Invitations Table (for invite-only sign-up)
+#### User Invitations Table
+
+The application now uses an enhanced `user_invitations` table that supports role-based invitations and expiration:
 
 ```sql
-CREATE TABLE invitations (
+CREATE TABLE user_invitations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   code TEXT UNIQUE NOT NULL,
   email TEXT NOT NULL,
-  used BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  used_at TIMESTAMP WITH TIME ZONE
+  role user_role DEFAULT 'agent' NOT NULL,
+  invited_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  status TEXT DEFAULT 'pending' NOT NULL,
+  used_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
-
--- Enable RLS
-ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow public access to validate codes
-CREATE POLICY "Anyone can validate invitation codes" ON invitations
-  FOR SELECT
-  USING (NOT used);
 ```
+
+**Invitation Features:**
+- **Role Assignment**: Invitations can specify the role (admin, agent, customer, guest)
+- **Expiration**: Invitations automatically expire after a set time
+- **Status Tracking**: pending, accepted, expired, cancelled
+- **Audit Trail**: Tracks who created the invitation and when it was used
+
+**Helper Functions:**
+- `generate_invitation_code()`: Creates a unique invitation code
+- `create_invitation(email, role, expires_in_days)`: Creates a new invitation
+- `accept_invitation(code)`: Validates and accepts an invitation
+- `expire_old_invitations()`: Automatically expires old invitations
 
 ### 4. Configure Authentication Providers
 
@@ -308,14 +318,83 @@ The router automatically protects routes based on authentication status:
 
 ## Role-Based Access Control
 
-To implement role-based access, extend the router guards:
+The application supports four user roles with different access levels:
+
+### User Roles
+
+1. **Admin** (`admin`)
+   - Full access to all features and data
+   - Can manage users, invitations, and system settings
+   - Can view and modify all records
+
+2. **Agent** (`agent`)
+   - Can manage customers and tickets they own
+   - Can view customer interactions
+   - Limited to their assigned data
+
+3. **Customer** (`customer`)
+   - Can view their own profile and customer record
+   - Can view tickets linked to their customer record
+   - Can add comments to their tickets
+   - Read-only access to their data
+
+4. **Guest** (`guest`)
+   - Read-only access to public dashboards
+   - Cannot create or modify data
+   - Returns empty datasets for most queries
+
+### User Status
+
+Each user has a status that affects their permissions:
+
+- **Active** (`active`): Full access according to their role
+- **Disabled** (`disabled`): Cannot mutate any data, blocked from write operations
+- **Invited** (`invited`): User has been invited but hasn't signed up yet
+- **Pending** (`pending`): User account is pending approval
+
+### Implementation
+
+The profiles table includes these fields:
+
+```sql
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  role user_role DEFAULT 'agent' NOT NULL,
+  status user_status DEFAULT 'active' NOT NULL,
+  last_active_at TIMESTAMP WITH TIME ZONE,
+  disabled_at TIMESTAMP WITH TIME ZONE,
+  -- ... other fields
+);
+```
+
+**RLS Policies** automatically enforce role-based permissions:
+- All write operations check that `status != 'disabled'`
+- Customers can only access their own data
+- Guests have read-only access
+- Admins bypass most restrictions
+
+To implement role-based routing in Flutter:
 
 ```dart
 if (isAuthenticated && !isAuthRoute) {
   final userRole = authState.userRole;
+  final userStatus = authState.userStatus;
   
+  // Block disabled users
+  if (userStatus == 'disabled') {
+    return '/unauthorized';
+  }
+  
+  // Role-based routing
   if (state.uri.path == '/admin' && userRole != 'admin') {
     return '/dashboard';
+  }
+  
+  // Guest users can only access public pages
+  if (userRole == 'guest' && !publicRoutes.contains(state.uri.path)) {
+    return '/public-dashboard';
   }
 }
 ```

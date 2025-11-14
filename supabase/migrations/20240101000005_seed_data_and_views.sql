@@ -105,6 +105,7 @@ SELECT
     p.full_name,
     p.email,
     p.role,
+    p.status,
     -- Ticket counts by status
     (SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = p.id AND t.status = 'open') as open_tickets,
     (SELECT COUNT(*) FROM tickets t WHERE t.assigned_to = p.id AND t.status = 'in_progress') as in_progress_tickets,
@@ -119,7 +120,8 @@ SELECT
      JOIN customers c ON ci.customer_id = c.id 
      WHERE c.owner = p.id AND ci.created_at >= NOW() - INTERVAL '7 days') as recent_interaction_activity
 FROM profiles p
-WHERE p.role IN ('agent', 'admin');
+WHERE p.role IN ('agent', 'admin')
+AND p.status = 'active';
 
 -- Grant usage of views to authenticated users
 GRANT SELECT ON customer_summary TO authenticated;
@@ -131,10 +133,27 @@ GRANT SELECT ON user_workload TO authenticated;
 
 -- Create a function to get dashboard data
 CREATE OR REPLACE FUNCTION get_dashboard_data(p_user_id UUID DEFAULT NULL)
-RETURNS JSON AS $$
+RETURNS JSON AS $
 DECLARE
     result JSON;
+    user_role_val user_role;
+    user_email_val TEXT;
 BEGIN
+    -- Get user role if p_user_id is provided
+    IF p_user_id IS NOT NULL THEN
+        SELECT role, email INTO user_role_val, user_email_val FROM profiles WHERE id = p_user_id;
+        
+        -- Return empty dataset for guests
+        IF user_role_val = 'guest' THEN
+            RETURN json_build_object(
+                'customer_stats', get_customer_stats(p_user_id),
+                'ticket_stats', get_ticket_stats(p_user_id),
+                'recent_activities', '[]'::json,
+                'upcoming_followups', '[]'::json
+            );
+        END IF;
+    END IF;
+    
     SELECT json_build_object(
         'customer_stats', get_customer_stats(p_user_id),
         'ticket_stats', get_ticket_stats(p_user_id),
@@ -152,7 +171,14 @@ BEGIN
             )
             FROM tickets t
             LEFT JOIN customers c ON t.customer_id = c.id
-            WHERE (p_user_id IS NULL OR t.assigned_to = p_user_id OR t.created_by = p_user_id)
+            WHERE (p_user_id IS NULL OR 
+                   (user_role_val = 'admin') OR
+                   (user_role_val IN ('agent', 'admin') AND (t.assigned_to = p_user_id OR t.created_by = p_user_id)) OR
+                   (user_role_val = 'customer' AND EXISTS (
+                       SELECT 1 FROM customers 
+                       WHERE customers.id = t.customer_id 
+                       AND customers.email = user_email_val
+                   )))
             AND t.status NOT IN ('resolved', 'closed')
             ORDER BY t.updated_at DESC
             LIMIT 5
@@ -172,7 +198,9 @@ BEGIN
             JOIN customers c ON ci.customer_id = c.id
             WHERE ci.follow_up_date IS NOT NULL
             AND ci.follow_up_date <= NOW() + INTERVAL '7 days'
-            AND (p_user_id IS NULL OR c.owner = p_user_id)
+            AND (p_user_id IS NULL OR 
+                 (user_role_val = 'admin') OR
+                 (user_role_val IN ('agent', 'admin') AND c.owner = p_user_id))
             ORDER BY ci.follow_up_date ASC
             LIMIT 5
         )
@@ -180,7 +208,7 @@ BEGIN
     
     RETURN result;
 END;
-$$ language 'plpgsql';
+$ language 'plpgsql';
 
 -- Create a function to validate product constraint before insertion
 CREATE OR REPLACE FUNCTION validate_product_active_count()
