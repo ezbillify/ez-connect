@@ -25,12 +25,13 @@ class Env {
     final targetEnvironment = environment ??
         (_appEnvOverride.isNotEmpty ? _appEnvOverride : 'development');
 
-    final candidateFiles = <String>{
+    final candidateFiles = <String>[
+      '.env.local',
       'config/environments/.env.$targetEnvironment',
       '.env.$targetEnvironment',
       '.env',
       'config/environments/.env.development',
-    };
+    ];
 
     for (final fileName in candidateFiles) {
       try {
