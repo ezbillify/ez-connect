@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:gotrue/gotrue.dart' hide Provider;
-import 'package:supabase_flutter/supabase_flutter.dart' hide Provider;
 import 'package:app/data/datasources/supabase_auth_datasource.dart';
 import 'package:app/data/repositories/auth_repository_impl.dart';
 import 'package:app/domain/models/auth_state.dart' as auth_state_model;
@@ -60,7 +59,7 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
     } catch (e) {
       state = state.copyWith(
         status: auth_state_model.AuthStatus.error,
-        error: e.toString(),
+        error: _formatErrorMessage(e),
       );
     }
   }
@@ -70,7 +69,10 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
     required String password,
   }) async {
     try {
-      state = state.copyWith(status: auth_state_model.AuthStatus.loading, error: null);
+      state = state.copyWith(
+        status: auth_state_model.AuthStatus.loading,
+        error: null,
+      );
       final user = await authRepository.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -82,12 +84,20 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
         userRole: role,
         error: null,
       );
-    } catch (e) {
-      state = state.copyWith(
-        status: auth_state_model.AuthStatus.error,
-        error: e.toString(),
+    } on AuthException catch (e) {
+      state = auth_state_model.AuthState(
+        status: auth_state_model.AuthStatus.unauthenticated,
+        user: null,
+        userRole: null,
+        error: _formatErrorMessage(e),
       );
-      rethrow;
+    } catch (e) {
+      state = auth_state_model.AuthState(
+        status: auth_state_model.AuthStatus.error,
+        user: null,
+        userRole: null,
+        error: _formatErrorMessage(e),
+      );
     }
   }
 
@@ -167,10 +177,36 @@ class AuthNotifier extends StateNotifier<auth_state_model.AuthState> {
     } catch (e) {
       state = state.copyWith(
         status: auth_state_model.AuthStatus.error,
-        error: e.toString(),
+        error: _formatErrorMessage(e),
       );
       rethrow;
     }
+  }
+
+  String _formatErrorMessage(Object error) {
+    if (error is AuthException) {
+      final message = error.message.trim();
+      if (message.isEmpty) {
+        return 'Unable to complete authentication. Please try again.';
+      }
+      if (message.toLowerCase().contains('invalid login credentials')) {
+        return 'Invalid email or password.';
+      }
+      return message;
+    }
+
+    var message = error.toString();
+    message = message.replaceFirst(RegExp(r'^Exception:\s*'), '').trim();
+    if (message.toLowerCase().startsWith('failed to sign in:')) {
+      message = message.substring('failed to sign in:'.length).trim();
+    }
+    if (message.toLowerCase().contains('invalid login credentials')) {
+      return 'Invalid email or password.';
+    }
+    if (message.isEmpty) {
+      return 'Something went wrong. Please try again.';
+    }
+    return message;
   }
 
   void clearError() {
