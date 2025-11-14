@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2024-11-13
+
+### Added - RBAC Extensions
+
+#### User Roles and Status Management
+- Extended user roles from 2 to 4: `admin`, `agent`, `customer`, `guest`
+- Added user status tracking: `active`, `disabled`, `invited`, `pending`
+- Status-aware RLS policies prevent disabled users from mutating data
+- Role-based data filtering in all helper functions and views
+- Customer role enables self-service portal access
+- Guest role provides read-only access to public dashboards
+
+#### User Invitations System
+- Created `user_invitations` table with full audit trail
+- Automatic invitation code generation
+- Role-based invitation assignment
+- Invitation expiration and validation
+- Helper functions: `create_invitation()`, `accept_invitation()`, `expire_old_invitations()`
+- Sample test invitations for agents and customers
+
+#### Enhanced Security
+- All write operations check user status
+- Customers can only view their own data and linked tickets
+- Guests have read-only access
+- Admins retain full access regardless of status
+- Updated RLS policies across all tables
+
+#### Database Migration
+- Migration 7: `20240101000007_rbac_extensions.sql`
+- Backward compatible with existing data
+- All existing users set to `active` status
+- Comprehensive test coverage in `test_migrations.sql`
+
+#### Documentation
+- Updated `docs/AUTHENTICATION.md` with RBAC details
+- Added RBAC section to `MIGRATION_FIXES.md`
+- Sample invitation codes for testing
+
 ## [1.0.0] - 2024-11-13
 
 ### Added - Initial CRM Module Implementation

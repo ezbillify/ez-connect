@@ -1,26 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:gap/gap.dart';
+import 'package:app/domain/models/auth_state.dart' as auth_state_model;
 import 'package:app/presentation/providers/auth_provider.dart';
+import 'package:app/shared/widgets/custom_button.dart';
+import 'package:app/shared/widgets/custom_text_field.dart';
+import 'package:app/shared/widgets/custom_toast.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({Key? key}) : super(key: key);
+  const LoginScreen({super.key});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  late TextEditingController _emailController;
-  late TextEditingController _passwordController;
-  bool _obscurePassword = true;
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  bool _isPasswordObscured = true;
 
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController();
     _passwordController = TextEditingController();
+
+    ref.listen<auth_state_model.AuthState>(
+      authProvider,
+      (_, next) {
+        if (!mounted) {
+          return;
+        }
+
+        if (next.status == auth_state_model.AuthStatus.authenticated) {
+          context.go('/dashboard');
+          return;
+        }
+
+        final errorMessage = next.error;
+        if (errorMessage != null &&
+            errorMessage.isNotEmpty &&
+            next.status != auth_state_model.AuthStatus.loading) {
+          CustomToast.show(
+            context,
+            message: errorMessage,
+            type: ToastType.error,
+          );
+        }
+      },
+      fireImmediately: false,
+    );
   }
 
   @override
@@ -30,159 +60,165 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     super.dispose();
   }
 
-  void _handleSignIn() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email and password')),
-      );
+  void _togglePasswordVisibility() {
+    setState(() {
+      _isPasswordObscured = !_isPasswordObscured;
+    });
+  }
+
+  Future<void> _handleSignIn() async {
+    if (_formKey.currentState?.validate() != true) {
       return;
     }
 
-    try {
-      await ref.read(authProvider.notifier).signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text,
-      );
-      if (mounted && context.mounted) {
-        context.go('/dashboard');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Sign in failed: $e')),
+    FocusScope.of(context).unfocus();
+    await ref.read(authProvider.notifier).signInWithEmailAndPassword(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
         );
-      }
+  }
+
+  String? _validateEmail(String? value) {
+    final trimmed = value?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return 'Email is required.';
     }
+    final emailRegExp = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    if (!emailRegExp.hasMatch(trimmed)) {
+      return 'Enter a valid email address.';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required.';
+    }
+    if (value.length < 6) {
+      return 'Password must be at least 6 characters.';
+    }
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = ref.watch(authLoadingProvider);
+    final authState = ref.watch(authProvider);
+    final isLoading = authState.status == auth_state_model.AuthStatus.loading;
+    final errorMessage = authState.error;
+    final shouldShowInlineError = errorMessage != null &&
+        errorMessage.isNotEmpty &&
+        authState.status != auth_state_model.AuthStatus.loading;
+
+    void clearInlineError() {
+      if (errorMessage != null && errorMessage.isNotEmpty) {
+        ref.read(authProvider.notifier).clearError();
+      }
+    }
 
     return Scaffold(
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(height: MediaQuery.of(context).size.height * 0.1),
-              Text(
-                'Welcome Back',
-                style: Theme.of(context).textTheme.displaySmall,
-                textAlign: TextAlign.center,
-              ),
-              const Gap(8),
-              Text(
-                'Sign in to continue',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.grey[600],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const Gap(48),
-              TextFormField(
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                decoration: InputDecoration(
-                  hintText: 'Email',
-                  prefixIcon: const Icon(Icons.email_outlined),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  enabled: !isLoading,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: BorderSide(
+                  color:
+                      Theme.of(context).colorScheme.outline.withOpacity(0.2),
                 ),
               ),
-              const Gap(16),
-              TextFormField(
-                controller: _passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  hintText: 'Password',
-                  prefixIcon: const Icon(Icons.lock_outline),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 32,
+                ),
+                child: Form(
+                  key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'Welcome back',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Sign in with your email and password to continue.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                      ),
+                      const SizedBox(height: 32),
+                      CustomTextField(
+                        controller: _emailController,
+                        label: 'Email',
+                        hintText: 'admin@ezbillify.com',
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        enabled: !isLoading,
+                        validator: _validateEmail,
+                        onChanged: (_) => clearInlineError(),
+                      ),
+                      const SizedBox(height: 24),
+                      CustomTextField(
+                        controller: _passwordController,
+                        label: 'Password',
+                        hintText: 'Enter your password',
+                        obscureText: _isPasswordObscured,
+                        onToggleObscureText: _togglePasswordVisibility,
+                        textInputAction: TextInputAction.done,
+                        enabled: !isLoading,
+                        validator: _validatePassword,
+                        onFieldSubmitted: (_) => _handleSignIn(),
+                        onChanged: (_) => clearInlineError(),
+                      ),
+                      const SizedBox(height: 24),
+                      if (shouldShowInlineError) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .errorContainer,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            errorMessage!,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onErrorContainer,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      CustomButton(
+                        label: 'Sign In',
+                        isLoading: isLoading,
+                        onPressed: isLoading ? null : _handleSignIn,
+                      ),
+                    ],
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  enabled: !isLoading,
                 ),
               ),
-              const Gap(8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: isLoading
-                      ? null
-                      : () => context.push('/auth/forgot-password'),
-                  child: const Text('Forgot Password?'),
-                ),
-              ),
-              const Gap(24),
-              ElevatedButton(
-                onPressed: isLoading ? null : _handleSignIn,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: isLoading
-                    ? const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-                    : const Text('Sign In'),
-              ),
-              const Gap(16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "Don't have an account? ",
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  TextButton(
-                    onPressed: isLoading ? null : () => context.push('/auth/signup'),
-                    child: const Text('Sign Up'),
-                  ),
-                ],
-              ),
-              const Gap(16),
-              Divider(color: Colors.grey[300]),
-              const Gap(16),
-              OutlinedButton.icon(
-                onPressed: isLoading ? null : () => _handleMagicLink(),
-                icon: const Icon(Icons.mail_outline),
-                label: const Text('Sign in with Magic Link'),
-              ),
-            ],
+            ),
           ),
         ),
       ),
-    );
-  }
-
-  void _handleMagicLink() {
-    if (_emailController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your email')),
-      );
-      return;
-    }
-
-    context.push(
-      '/auth/magic-link',
-      extra: _emailController.text.trim(),
     );
   }
 }

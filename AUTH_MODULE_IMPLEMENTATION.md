@@ -307,6 +307,190 @@ await authNotifier.signOut();
 ✅ Session auto-refresh  
 ✅ Automatic re-authentication  
 
+## User Management APIs
+
+### Overview
+
+The authentication module now includes comprehensive user management APIs for administrators:
+
+- **SQL Helper Functions**: Atomic user operations with audit logging
+- **Edge Function**: REST API with email notifications
+- **Activity Log View**: Complete audit trail of user operations
+- **RLS Protection**: Admin-only access control
+
+### Features
+
+1. **User Invitations**
+   - Create new user invitations
+   - Resend invitations with new codes
+   - Automatic email delivery
+
+2. **Role Management**
+   - Bulk update user roles
+   - Prevent self-role changes
+   - Audit all changes
+
+3. **User Status**
+   - Activate/deactivate users
+   - Ban/unban functionality
+   - Status tracking
+
+4. **Password Management**
+   - Admin password resets
+   - Notification emails
+   - Secure audit logging
+
+5. **Activity Logging**
+   - View all user operations
+   - Filter by action type
+   - Pagination support
+
+### SQL Functions
+
+Located in: `supabase/migrations/20240101000007_user_admin_functions.sql`
+
+- `is_admin()` - Check if current user is admin
+- `create_user_invitation(email, role)` - Create invitation
+- `resend_user_invitation(invitation_id)` - Resend invitation
+- `bulk_update_user_roles(user_ids[], new_role)` - Update multiple roles
+- `toggle_user_status(user_id, is_active)` - Activate/deactivate user
+- `reset_user_password(user_id, new_password)` - Reset password
+- `get_user_activity_log(limit, offset)` - Fetch activity log
+
+All functions:
+- ✅ Write to `audit_history` table
+- ✅ Respect RLS policies (admin-only)
+- ✅ Return sanitized JSON responses
+- ✅ Include error handling
+
+### Edge Function
+
+Located in: `supabase/functions/user-admin/`
+
+**Endpoints:**
+- `POST /invitations` - Create invitation
+- `POST /invitations/:id/resend` - Resend invitation
+- `POST /users/roles/bulk` - Bulk role update
+- `PATCH /users/:id/status` - Toggle status
+- `PATCH /users/:id/password` - Reset password
+- `GET /activity-log` - Get activity log
+
+**Authentication:**
+All endpoints require admin JWT token in Authorization header:
+```
+Authorization: Bearer <admin_jwt_token>
+```
+
+**Email Delivery:**
+The Edge Function automatically sends emails for:
+- User invitations (with invitation code)
+- Password resets (with reset link)
+
+### Email Configuration
+
+To enable email notifications:
+
+1. **Supabase Dashboard**
+   - Go to **Project Settings > Auth > SMTP Settings**
+   - Configure SMTP provider (SendGrid, Postmark, AWS SES, etc.)
+
+2. **Environment Variables**
+   ```bash
+   SMTP_HOST=smtp.sendgrid.net
+   SMTP_PORT=587
+   SMTP_USER=apikey
+   SMTP_PASS=your_api_key
+   SMTP_FROM=noreply@yourdomain.com
+   ```
+
+3. **Edge Function Environment**
+   The function reads `SMTP_FROM` from environment variables
+
+### User Activity Log View
+
+The `user_activity_log` view provides a flattened view of audit history:
+
+**Columns:**
+- `entity_type` - Type of entity (profiles, user_invitations)
+- `action` - Action performed (CREATE_INVITATION, RESET_PASSWORD, etc.)
+- `actor_email` - Who performed the action
+- `target_email` - Who was affected
+- `details` - JSON with action-specific details
+- `created_at` - Timestamp
+
+**Access:**
+Only admins can query this view via `get_user_activity_log()` function.
+
+### Deployment
+
+#### Deploy Edge Function
+
+```bash
+# Deploy the user-admin Edge Function
+supabase functions deploy user-admin
+
+# Set environment variables
+supabase secrets set SMTP_FROM=noreply@yourdomain.com
+```
+
+#### Apply Migration
+
+```bash
+# Apply the new migration locally
+./supabase_dev.sh migrate
+
+# Or for production
+supabase db push
+```
+
+### Testing
+
+The test suite includes comprehensive tests for all user admin functions:
+
+```bash
+# Run migration tests (includes user admin tests)
+./supabase_dev.sh shell
+\i sql/test_migrations.sql
+```
+
+**Tests verify:**
+- All functions exist
+- Functions work for admin users
+- Non-admin access is denied
+- Activity log is populated
+- Audit history is written
+
+### Usage Examples
+
+#### In Flutter/Dart
+
+```dart
+// Using Edge Function
+final response = await supabase.functions.invoke(
+  'user-admin',
+  method: HttpMethod.post,
+  body: {'email': 'user@example.com', 'role': 'agent'},
+);
+
+// Using RPC directly
+final result = await supabase.rpc('create_user_invitation', params: {
+  'p_email': 'user@example.com',
+  'p_role': 'agent',
+});
+```
+
+#### In SQL/Shell
+
+```sql
+-- Create invitation
+SELECT create_user_invitation('user@example.com', 'agent');
+
+-- Get activity log
+SELECT * FROM get_user_activity_log(100, 0);
+```
+
+See `docs/AUTHENTICATION.md` for complete API documentation.
+
 ## Customization Points
 
 1. **Add OAuth Providers** - Update `auth_notifier` with provider methods
@@ -314,6 +498,7 @@ await authNotifier.signOut();
 3. **Extend User Model** - Add fields to `User` class
 4. **Add Role Restrictions** - Update redirect logic in `router_provider.dart`
 5. **Change Email Templates** - Configure in Supabase dashboard
+6. **Customize Email Provider** - Update Edge Function to use different SMTP service
 
 ## Troubleshooting
 

@@ -18,9 +18,12 @@ ALTER TABLE audit_history ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view own profile" ON profiles
     FOR SELECT USING (auth.uid() = id);
 
--- Users can update their own profile
+-- Users can update their own profile (if not disabled)
 CREATE POLICY "Users can update own profile" ON profiles
-    FOR UPDATE USING (auth.uid() = id);
+    FOR UPDATE USING (
+        auth.uid() = id AND
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled'
+    );
 
 -- Admins can view all profiles
 CREATE POLICY "Admins can view all profiles" ON profiles
@@ -36,7 +39,7 @@ CREATE POLICY "Admins can insert profiles" ON profiles
         (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
     );
 
--- Admins can update all profiles
+-- Admins can update all profiles (even if disabled)
 CREATE POLICY "Admins can update all profiles" ON profiles
     FOR UPDATE USING (
         auth.jwt() ->> 'role' = 'admin' OR
@@ -68,77 +71,89 @@ CREATE POLICY "Admins can manage acquisition stages" ON acquisition_stages
     );
 
 -- Customers policies
--- Users can view customers they own or all customers (depending on role)
+-- Admins can view all customers
+-- Agents can view customers they own
+-- Customers can view their own customer record (if linked)
+-- Guests have no access to customers
 CREATE POLICY "Users can view assigned customers" ON customers
     FOR SELECT USING (
-        owner = auth.uid() OR
-        (auth.jwt() ->> 'role' = 'admin') OR
-        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
+        (owner = auth.uid() AND (SELECT role FROM profiles WHERE id = auth.uid()) IN ('agent', 'admin')) OR
+        ((SELECT role FROM profiles WHERE id = auth.uid()) = 'customer' AND 
+         EXISTS (SELECT 1 FROM customers WHERE id = customers.id AND email = (SELECT email FROM profiles WHERE id = auth.uid())))
     );
 
--- Users can insert customers
-CREATE POLICY "Users can insert customers" ON customers
+-- Agents and admins can insert customers (if not disabled)
+CREATE POLICY "Agents can insert customers" ON customers
     FOR INSERT WITH CHECK (
-        auth.role() = 'authenticated'
+        (SELECT role FROM profiles WHERE id = auth.uid()) IN ('agent', 'admin') AND
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled'
     );
 
--- Users can update customers they own
+-- Agents can update customers they own, admins can update all (if not disabled)
 CREATE POLICY "Users can update assigned customers" ON customers
     FOR UPDATE USING (
-        owner = auth.uid() OR
-        (auth.jwt() ->> 'role' = 'admin') OR
-        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+        ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
+         (owner = auth.uid() AND (SELECT role FROM profiles WHERE id = auth.uid()) = 'agent')) AND
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled'
     );
 
 -- Customer interactions policies
--- Users can view interactions for customers they own
+-- Admins can view all interactions, agents can view interactions for their customers
 CREATE POLICY "Users can view customer interactions" ON customer_interactions
     FOR SELECT USING (
+        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
         EXISTS (
             SELECT 1 FROM customers 
             WHERE customers.id = customer_interactions.customer_id 
-            AND (customers.owner = auth.uid() OR 
-                 (auth.jwt() ->> 'role' = 'admin') OR
-                 (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin')
+            AND customers.owner = auth.uid()
+            AND (SELECT role FROM profiles WHERE id = auth.uid()) IN ('agent', 'admin')
         )
     );
 
--- Users can insert interactions for customers they own
-CREATE POLICY "Users can insert customer interactions" ON customer_interactions
+-- Agents and admins can insert interactions (if not disabled)
+CREATE POLICY "Agents can insert customer interactions" ON customer_interactions
     FOR INSERT WITH CHECK (
-        EXISTS (
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled' AND
+        ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
+         (EXISTS (
             SELECT 1 FROM customers 
             WHERE customers.id = customer_interactions.customer_id 
-            AND (customers.owner = auth.uid() OR 
-                 (auth.jwt() ->> 'role' = 'admin') OR
-                 (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin')
-        )
+            AND customers.owner = auth.uid()
+            AND (SELECT role FROM profiles WHERE id = auth.uid()) = 'agent'
+        )))
     );
 
 -- Tickets policies
--- Users can view tickets they created or are assigned to
+-- Admins can view all tickets
+-- Agents can view tickets they created or are assigned to
+-- Customers can view tickets linked to their customer record
 CREATE POLICY "Users can view assigned tickets" ON tickets
     FOR SELECT USING (
-        created_by = auth.uid() OR
-        assigned_to = auth.uid() OR
-        (auth.jwt() ->> 'role' = 'admin') OR
-        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
+        (created_by = auth.uid() AND (SELECT role FROM profiles WHERE id = auth.uid()) IN ('agent', 'admin')) OR
+        (assigned_to = auth.uid() AND (SELECT role FROM profiles WHERE id = auth.uid()) IN ('agent', 'admin')) OR
+        ((SELECT role FROM profiles WHERE id = auth.uid()) = 'customer' AND
+         EXISTS (SELECT 1 FROM customers 
+                 WHERE customers.id = tickets.customer_id 
+                 AND customers.email = (SELECT email FROM profiles WHERE id = auth.uid())))
     );
 
--- Users can insert tickets
+-- Authenticated users can insert tickets (if not disabled)
 CREATE POLICY "Users can insert tickets" ON tickets
     FOR INSERT WITH CHECK (
         auth.role() = 'authenticated' AND
-        created_by = auth.uid()
+        created_by = auth.uid() AND
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled'
     );
 
--- Users can update tickets they created or are assigned to
+-- Users can update tickets they created or are assigned to (if not disabled)
 CREATE POLICY "Users can update assigned tickets" ON tickets
     FOR UPDATE USING (
-        created_by = auth.uid() OR
-        assigned_to = auth.uid() OR
-        (auth.jwt() ->> 'role' = 'admin') OR
-        (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled' AND
+        ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
+         created_by = auth.uid() OR
+         assigned_to = auth.uid())
     );
 
 -- Ticket workflow history policies
@@ -188,45 +203,58 @@ CREATE POLICY "Users can manage ticket assignees" ON ticket_assignees
     );
 
 -- Ticket comments policies
--- Users can view comments for tickets they can see
+-- Users can view comments for tickets they can see (respects ticket access rules)
 CREATE POLICY "Users can view ticket comments" ON ticket_comments
     FOR SELECT USING (
         EXISTS (
             SELECT 1 FROM tickets 
             WHERE tickets.id = ticket_comments.ticket_id 
-            AND (tickets.created_by = auth.uid() OR 
+            AND ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
+                 tickets.created_by = auth.uid() OR 
                  tickets.assigned_to = auth.uid() OR
-                 (auth.jwt() ->> 'role' = 'admin') OR
-                 (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin')
+                 ((SELECT role FROM profiles WHERE id = auth.uid()) = 'customer' AND
+                  EXISTS (SELECT 1 FROM customers 
+                          WHERE customers.id = tickets.customer_id 
+                          AND customers.email = (SELECT email FROM profiles WHERE id = auth.uid()))))
         )
     );
 
--- Users can insert comments for tickets they can see
+-- Users can insert comments for tickets they can access (if not disabled)
 CREATE POLICY "Users can insert ticket comments" ON ticket_comments
     FOR INSERT WITH CHECK (
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled' AND
+        created_by = auth.uid() AND
         EXISTS (
             SELECT 1 FROM tickets 
             WHERE tickets.id = ticket_comments.ticket_id 
-            AND (tickets.created_by = auth.uid() OR 
+            AND ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin' OR
+                 tickets.created_by = auth.uid() OR 
                  tickets.assigned_to = auth.uid() OR
-                 (auth.jwt() ->> 'role' = 'admin') OR
-                 (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin')
-        ) AND
-        created_by = auth.uid()
+                 ((SELECT role FROM profiles WHERE id = auth.uid()) = 'customer' AND
+                  EXISTS (SELECT 1 FROM customers 
+                          WHERE customers.id = tickets.customer_id 
+                          AND customers.email = (SELECT email FROM profiles WHERE id = auth.uid()))))
+        )
     );
 
--- Users can update their own comments
+-- Users can update their own comments (if not disabled)
 CREATE POLICY "Users can update own comments" ON ticket_comments
-    FOR UPDATE USING (created_by = auth.uid());
+    FOR UPDATE USING (
+        created_by = auth.uid() AND
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled'
+    );
 
 -- Integration tokens policies
 -- Users can view their own integration tokens
 CREATE POLICY "Users can view own integration tokens" ON integration_tokens
     FOR SELECT USING (created_by = auth.uid());
 
--- Users can manage their own integration tokens
+-- Users can manage their own integration tokens (if not disabled)
 CREATE POLICY "Users can manage own integration tokens" ON integration_tokens
-    FOR ALL USING (created_by = auth.uid());
+    FOR ALL USING (
+        created_by = auth.uid() AND
+        (SELECT status FROM profiles WHERE id = auth.uid()) != 'disabled'
+    );
 
 -- Admins can view all integration tokens
 CREATE POLICY "Admins can view all integration tokens" ON integration_tokens

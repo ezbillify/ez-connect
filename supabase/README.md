@@ -251,12 +251,82 @@ SELECT * FROM customers;
    supabase db push
    ```
 
+4. **Deploy Edge Functions**
+   ```bash
+   # Deploy integration-tickets function
+   supabase functions deploy integration-tickets
+   
+   # Deploy user-admin function
+   supabase functions deploy user-admin
+   
+   # Set environment variables for Edge Functions
+   supabase secrets set SMTP_FROM=noreply@yourdomain.com
+   ```
+
 ### Environment Variables
 
 For production, update your environment:
 ```bash
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your_production_anon_key
+```
+
+### Edge Functions
+
+The project includes two Supabase Edge Functions:
+
+#### 1. integration-tickets
+
+Location: `supabase/functions/integration-tickets/`
+
+Purpose: REST API for external ticket management integrations
+
+Deploy:
+```bash
+supabase functions deploy integration-tickets
+```
+
+#### 2. user-admin
+
+Location: `supabase/functions/user-admin/`
+
+Purpose: User management APIs for administrators (invitations, role updates, password resets)
+
+Deploy:
+```bash
+supabase functions deploy user-admin
+
+# Configure SMTP for email notifications
+supabase secrets set SMTP_FROM=noreply@yourdomain.com
+```
+
+**Required Secrets:**
+- `SMTP_FROM` - Email address for outbound notifications
+
+**Endpoints:**
+- `POST /invitations` - Create user invitation
+- `POST /invitations/:id/resend` - Resend invitation
+- `POST /users/roles/bulk` - Bulk update user roles
+- `PATCH /users/:id/status` - Toggle user status
+- `PATCH /users/:id/password` - Reset user password
+- `GET /activity-log` - Get user activity log
+
+See `docs/AUTHENTICATION.md` for complete API documentation.
+
+### Deploying All Components
+
+To deploy everything at once:
+
+```bash
+# Deploy database migrations
+supabase db push
+
+# Deploy all Edge Functions
+supabase functions deploy integration-tickets
+supabase functions deploy user-admin
+
+# Set required secrets
+supabase secrets set SMTP_FROM=noreply@yourdomain.com
 ```
 
 ## 📚 Documentation

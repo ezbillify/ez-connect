@@ -141,13 +141,21 @@ class SupabaseAuthDatasource {
   Future<bool> validateInvitationCode(String code) async {
     try {
       final response = await supabaseClient
-          .from('invitations')
-          .select('id')
+          .from('user_invitations')
+          .select('id, email, role, expires_at, status')
           .eq('code', code)
-          .eq('used', false)
+          .eq('status', 'pending')
           .maybeSingle();
 
-      return response != null;
+      if (response == null) return false;
+
+      // Check if invitation has expired
+      final expiresAt = DateTime.parse(response['expires_at'] as String);
+      if (expiresAt.isBefore(DateTime.now())) {
+        return false;
+      }
+
+      return true;
     } catch (e) {
       return false;
     }
@@ -156,8 +164,33 @@ class SupabaseAuthDatasource {
   /// Mark invitation as used
   Future<void> markInvitationAsUsed(String code) async {
     await supabaseClient
+<<<<<<< HEAD
         .from('invitations')
         .update({'used': true}).eq('code', code);
+=======
+        .from('user_invitations')
+        .update({
+          'status': 'accepted',
+          'used_at': DateTime.now().toIso8601String(),
+        })
+        .eq('code', code);
+>>>>>>> b740fc5c8dfbc895640c3cae8219ec27e131162c
+  }
+
+  /// Get invitation details
+  Future<Map<String, dynamic>?> getInvitationDetails(String code) async {
+    try {
+      final response = await supabaseClient
+          .from('user_invitations')
+          .select('email, role, expires_at, status')
+          .eq('code', code)
+          .eq('status', 'pending')
+          .maybeSingle();
+
+      return response;
+    } catch (e) {
+      return null;
+    }
   }
 
   /// Stream auth state changes

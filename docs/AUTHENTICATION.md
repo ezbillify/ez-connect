@@ -82,26 +82,36 @@ CREATE POLICY "Users can update own profile" ON profiles
   USING (auth.uid() = id);
 ```
 
-#### Invitations Table (for invite-only sign-up)
+#### User Invitations Table
+
+The application now uses an enhanced `user_invitations` table that supports role-based invitations and expiration:
 
 ```sql
-CREATE TABLE invitations (
+CREATE TABLE user_invitations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   code TEXT UNIQUE NOT NULL,
   email TEXT NOT NULL,
-  used BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  used_at TIMESTAMP WITH TIME ZONE
+  role user_role DEFAULT 'agent' NOT NULL,
+  invited_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  status TEXT DEFAULT 'pending' NOT NULL,
+  used_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
 );
-
--- Enable RLS
-ALTER TABLE invitations ENABLE ROW LEVEL SECURITY;
-
--- Create policy to allow public access to validate codes
-CREATE POLICY "Anyone can validate invitation codes" ON invitations
-  FOR SELECT
-  USING (NOT used);
 ```
+
+**Invitation Features:**
+- **Role Assignment**: Invitations can specify the role (admin, agent, customer, guest)
+- **Expiration**: Invitations automatically expire after a set time
+- **Status Tracking**: pending, accepted, expired, cancelled
+- **Audit Trail**: Tracks who created the invitation and when it was used
+
+**Helper Functions:**
+- `generate_invitation_code()`: Creates a unique invitation code
+- `create_invitation(email, role, expires_in_days)`: Creates a new invitation
+- `accept_invitation(code)`: Validates and accepts an invitation
+- `expire_old_invitations()`: Automatically expires old invitations
 
 ### 4. Configure Authentication Providers
 
@@ -308,14 +318,83 @@ The router automatically protects routes based on authentication status:
 
 ## Role-Based Access Control
 
-To implement role-based access, extend the router guards:
+The application supports four user roles with different access levels:
+
+### User Roles
+
+1. **Admin** (`admin`)
+   - Full access to all features and data
+   - Can manage users, invitations, and system settings
+   - Can view and modify all records
+
+2. **Agent** (`agent`)
+   - Can manage customers and tickets they own
+   - Can view customer interactions
+   - Limited to their assigned data
+
+3. **Customer** (`customer`)
+   - Can view their own profile and customer record
+   - Can view tickets linked to their customer record
+   - Can add comments to their tickets
+   - Read-only access to their data
+
+4. **Guest** (`guest`)
+   - Read-only access to public dashboards
+   - Cannot create or modify data
+   - Returns empty datasets for most queries
+
+### User Status
+
+Each user has a status that affects their permissions:
+
+- **Active** (`active`): Full access according to their role
+- **Disabled** (`disabled`): Cannot mutate any data, blocked from write operations
+- **Invited** (`invited`): User has been invited but hasn't signed up yet
+- **Pending** (`pending`): User account is pending approval
+
+### Implementation
+
+The profiles table includes these fields:
+
+```sql
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  role user_role DEFAULT 'agent' NOT NULL,
+  status user_status DEFAULT 'active' NOT NULL,
+  last_active_at TIMESTAMP WITH TIME ZONE,
+  disabled_at TIMESTAMP WITH TIME ZONE,
+  -- ... other fields
+);
+```
+
+**RLS Policies** automatically enforce role-based permissions:
+- All write operations check that `status != 'disabled'`
+- Customers can only access their own data
+- Guests have read-only access
+- Admins bypass most restrictions
+
+To implement role-based routing in Flutter:
 
 ```dart
 if (isAuthenticated && !isAuthRoute) {
   final userRole = authState.userRole;
+  final userStatus = authState.userStatus;
   
+  // Block disabled users
+  if (userStatus == 'disabled') {
+    return '/unauthorized';
+  }
+  
+  // Role-based routing
   if (state.uri.path == '/admin' && userRole != 'admin') {
     return '/dashboard';
+  }
+  
+  // Guest users can only access public pages
+  if (userRole == 'guest' && !publicRoutes.contains(state.uri.path)) {
+    return '/public-dashboard';
   }
 }
 ```
@@ -396,6 +475,319 @@ final profile = await datasource.fetchUserProfile(userId);
 final role = profile['role'];
 ```
 
+## User Management (Admin Only)
+
+The application includes comprehensive user management APIs for administrators. These are exposed via a Supabase Edge Function.
+
+### Configuration
+
+#### Setting up SMTP for Email Notifications
+
+To enable email notifications for invitations and password resets, configure Supabase SMTP settings:
+
+1. Go to **Project Settings > Auth > SMTP Settings** in Supabase Dashboard
+2. Configure your SMTP provider (e.g., SendGrid, Postmark, AWS SES)
+3. Set the following environment variables:
+   ```bash
+   SMTP_HOST=smtp.sendgrid.net
+   SMTP_PORT=587
+   SMTP_USER=apikey
+   SMTP_PASS=your_sendgrid_api_key
+   SMTP_FROM=noreply@yourdomain.com
+   ```
+
+Alternatively, use Supabase's built-in email service (limited to development).
+
+### API Endpoints
+
+All user management endpoints require an admin user's JWT token in the Authorization header:
+
+```bash
+Authorization: Bearer <admin_jwt_token>
+```
+
+#### 1. Create User Invitation
+
+**Endpoint:** `POST /user-admin/invitations`
+
+**Headers:**
+```
+Authorization: Bearer <admin_jwt_token>
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "email": "newuser@example.com",
+  "role": "agent"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "invitation": {
+    "id": "uuid",
+    "email": "newuser@example.com",
+    "role": "agent",
+    "created_at": "2024-01-01T00:00:00Z"
+  },
+  "email_sent": true,
+  "email_error": null
+}
+```
+
+**Example (Dart/Flutter):**
+```dart
+final response = await supabase.functions.invoke(
+  'user-admin',
+  method: HttpMethod.post,
+  body: {
+    'email': 'newuser@example.com',
+    'role': 'agent',
+  },
+  headers: {
+    'Authorization': 'Bearer $adminToken',
+  },
+);
+```
+
+#### 2. Resend User Invitation
+
+**Endpoint:** `POST /user-admin/invitations/:id/resend`
+
+**Headers:**
+```
+Authorization: Bearer <admin_jwt_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "invitation": {
+    "id": "uuid",
+    "email": "newuser@example.com",
+    "resent_at": "2024-01-01T00:00:00Z"
+  },
+  "email_sent": true
+}
+```
+
+#### 3. Bulk Update User Roles
+
+**Endpoint:** `POST /user-admin/users/roles/bulk`
+
+**Request Body:**
+```json
+{
+  "user_ids": ["uuid1", "uuid2", "uuid3"],
+  "new_role": "admin"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "result": {
+    "updated_count": 3,
+    "updates": [
+      {
+        "user_id": "uuid1",
+        "old_role": "agent",
+        "new_role": "admin"
+      }
+    ]
+  }
+}
+```
+
+#### 4. Toggle User Status
+
+**Endpoint:** `PATCH /user-admin/users/:id/status`
+
+**Request Body:**
+```json
+{
+  "is_active": false
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "result": {
+    "user_id": "uuid",
+    "email": "user@example.com",
+    "old_status": "active",
+    "new_status": "banned",
+    "toggled_at": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+#### 5. Reset User Password
+
+**Endpoint:** `PATCH /user-admin/users/:id/password`
+
+**Request Body:**
+```json
+{
+  "new_password": "newpassword123"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "result": {
+    "user_id": "uuid",
+    "email": "user@example.com",
+    "reset_at": "2024-01-01T00:00:00Z"
+  },
+  "email_sent": true
+}
+```
+
+#### 6. Get User Activity Log
+
+**Endpoint:** `GET /user-admin/activity-log?limit=100&offset=0`
+
+**Response:**
+```json
+{
+  "success": true,
+  "logs": [
+    {
+      "id": "uuid",
+      "entity_type": "profiles",
+      "action": "CREATE_INVITATION",
+      "entity_id": "uuid",
+      "created_at": "2024-01-01T00:00:00Z",
+      "actor_id": "uuid",
+      "actor_email": "admin@example.com",
+      "actor_name": "Admin User",
+      "actor_role": "admin",
+      "target_email": "newuser@example.com",
+      "details": {
+        "email": "newuser@example.com",
+        "role": "agent"
+      }
+    }
+  ],
+  "pagination": {
+    "limit": 100,
+    "offset": 0
+  }
+}
+```
+
+### Using the API in Flutter
+
+Create a service class to interact with the user admin API:
+
+```dart
+class UserAdminService {
+  final SupabaseClient supabase;
+
+  UserAdminService(this.supabase);
+
+  Future<Map<String, dynamic>> createInvitation({
+    required String email,
+    required String role,
+  }) async {
+    final response = await supabase.functions.invoke(
+      'user-admin',
+      method: HttpMethod.post,
+      body: {
+        'email': email,
+        'role': role,
+      },
+    );
+
+    if (response.status != 201) {
+      throw Exception('Failed to create invitation: ${response.data}');
+    }
+
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> bulkUpdateRoles({
+    required List<String> userIds,
+    required String newRole,
+  }) async {
+    final response = await supabase.functions.invoke(
+      'user-admin/users/roles/bulk',
+      method: HttpMethod.post,
+      body: {
+        'user_ids': userIds,
+        'new_role': newRole,
+      },
+    );
+
+    if (response.status != 200) {
+      throw Exception('Failed to update roles: ${response.data}');
+    }
+
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> getActivityLog({
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final response = await supabase.functions.invoke(
+      'user-admin/activity-log?limit=$limit&offset=$offset',
+      method: HttpMethod.get,
+    );
+
+    if (response.status != 200) {
+      throw Exception('Failed to fetch activity log: ${response.data}');
+    }
+
+    final data = response.data as Map<String, dynamic>;
+    return (data['logs'] as List).cast<Map<String, dynamic>>();
+  }
+}
+```
+
+### SQL RPC Functions
+
+Alternatively, you can call the SQL functions directly using RPC:
+
+```dart
+// Create invitation
+final result = await supabase.rpc('create_user_invitation', params: {
+  'p_email': 'newuser@example.com',
+  'p_role': 'agent',
+});
+
+// Get activity log
+final logs = await supabase.rpc('get_user_activity_log', params: {
+  'p_limit': 100,
+  'p_offset': 0,
+});
+```
+
+**Note:** Direct RPC calls will not trigger email notifications. Use the Edge Function for full functionality.
+
+### Audit Trail
+
+All user management operations are automatically logged to the `audit_history` table and can be viewed through the `user_activity_log` view. This provides a complete audit trail of:
+
+- User invitations created
+- Invitations resent
+- Role changes
+- User status toggles (active/banned)
+- Password resets
+
+Only administrators can access the audit log through the `get_user_activity_log()` function.
+
 ## Security Best Practices
 
 1. **Never commit `.env`** - Add to `.gitignore`
@@ -406,6 +798,8 @@ final role = profile['role'];
 6. **Enable 2FA** for admin accounts
 7. **Review Supabase security settings** regularly
 8. **Keep dependencies updated**
+9. **Monitor user activity logs** for suspicious behavior
+10. **Restrict admin role** to trusted users only
 
 ## Testing
 
